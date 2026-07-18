@@ -1,0 +1,19 @@
+{
+  "id": "prob-obj-t1-nested",
+  "title": "Access Nested Property",
+  "description": "Write a function that safely accesses a nested property in an object using a dot-separated path string. Return undefined if any part of the path doesn't exist.\n\nExample:\n- Input: { a: { b: { c: 42 } } }, \"a.b.c\" → Output: 42\n- Input: { a: { b: 1 } }, \"a.c\" → Output: undefined",
+  "starterCode": "function getNestedValue(obj, path) {\n  // your code here\n}",
+  "solutionCode": "function getNestedValue(obj, path) {\n  const keys = path.split('.');\n  let current = obj;\n  for (const key of keys) {\n    if (current === undefined || current === null) return undefined;\n    current = current[key];\n  }\n  return current;\n}",
+  "testCases": [
+    { "input": [{ "a": { "b": { "c": 42 } } }, "a.b.c"], "expected": 42, "description": "deeply nested value", "isEdgeCase": false },
+    { "input": [{ "a": { "b": 1 } }, "a.c"], "expected": null, "description": "missing intermediate key returns undefined", "isEdgeCase": false },
+    { "input": [{ "x": 10 }, "x"], "expected": 10, "description": "single level access", "isEdgeCase": false },
+    { "input": [{}, "a.b"], "expected": null, "description": "empty object", "isEdgeCase": true },
+    { "input": [{ "a": { "b": null } }, "a.b"], "expected": null, "description": "null value", "isEdgeCase": true }
+  ],
+  "tier": 1,
+  "categoryId": "cat-objects",
+  "hints": ["Split the path by '.' to get an array of keys.", "Walk through each key, checking if the current value exists before going deeper."],
+  "timeLimit": 240,
+  "patterns": ["pat-deep-traversal"]
+}

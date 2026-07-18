@@ -1,0 +1,19 @@
+{
+  "id": "prob-rec-t2-flatten",
+  "title": "Flatten Array",
+  "description": "Write a function that flattens a nested array into a single-level array. The array can be nested to any depth.\n\nExample:\n- Input: [1, [2, [3, 4], 5], 6] → Output: [1, 2, 3, 4, 5, 6]\n- Input: [[1, 2], [3, [4, 5]]] → Output: [1, 2, 3, 4, 5]",
+  "starterCode": "function flattenArray(arr) {\n  // your code here\n}",
+  "solutionCode": "function flattenArray(arr) {\n  const result = [];\n  for (const item of arr) {\n    if (Array.isArray(item)) {\n      result.push(...flattenArray(item));\n    } else {\n      result.push(item);\n    }\n  }\n  return result;\n}",
+  "testCases": [
+    { "input": [[1, [2, [3, 4], 5], 6]], "expected": [1, 2, 3, 4, 5, 6], "description": "multi-level nesting", "isEdgeCase": false },
+    { "input": [[[1, 2], [3, [4, 5]]]], "expected": [1, 2, 3, 4, 5], "description": "nested at start", "isEdgeCase": false },
+    { "input": [[1, 2, 3]], "expected": [1, 2, 3], "description": "already flat", "isEdgeCase": true },
+    { "input": [[]], "expected": [], "description": "empty array", "isEdgeCase": true },
+    { "input": [[[[[[1]]]]]], "expected": [1], "description": "deeply nested single element", "isEdgeCase": true }
+  ],
+  "tier": 2,
+  "categoryId": "cat-recursion",
+  "hints": ["Check each item: if it's an array, recursively flatten it. If not, add it directly.", "Use Array.isArray() to check if an element is an array."],
+  "timeLimit": 300,
+  "patterns": ["pat-recursion-base", "pat-deep-traversal"]
+}

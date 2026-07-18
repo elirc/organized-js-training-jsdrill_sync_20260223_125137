@@ -1,0 +1,19 @@
+{
+  "id": "prob-str-t1-vowels",
+  "title": "Count Vowels",
+  "description": "Write a function that counts the number of vowels (a, e, i, o, u) in a string. The function should be case-insensitive.\n\nExample:\n- Input: \"hello\" → Output: 2\n- Input: \"AEIOU\" → Output: 5\n- Input: \"xyz\" → Output: 0",
+  "starterCode": "function countVowels(str) {\n  // your code here\n}",
+  "solutionCode": "function countVowels(str) {\n  const vowels = 'aeiou';\n  let count = 0;\n  for (const char of str.toLowerCase()) {\n    if (vowels.includes(char)) count++;\n  }\n  return count;\n}",
+  "testCases": [
+    { "input": ["hello"], "expected": 2, "description": "counts vowels in lowercase", "isEdgeCase": false },
+    { "input": ["AEIOU"], "expected": 5, "description": "counts uppercase vowels", "isEdgeCase": false },
+    { "input": ["xyz"], "expected": 0, "description": "returns 0 when no vowels", "isEdgeCase": false },
+    { "input": [""], "expected": 0, "description": "empty string has 0 vowels", "isEdgeCase": true },
+    { "input": ["aEiOu HeLLo"], "expected": 7, "description": "handles mixed case with spaces", "isEdgeCase": false }
+  ],
+  "tier": 1,
+  "categoryId": "cat-strings",
+  "hints": ["Convert to lowercase first, then check each character.", "The string 'aeiou' contains all vowels you need to check against."],
+  "timeLimit": 180,
+  "patterns": ["pat-accumulator", "pat-string-traversal"]
+}

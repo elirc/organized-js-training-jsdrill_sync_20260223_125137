@@ -1,0 +1,19 @@
+{
+  "id": "prob-sort-t1-find-min",
+  "title": "Find Minimum",
+  "description": "Write a function that returns the smallest number in an array.\n\nExample:\n- Input: [5, 3, 8, 1, 9] → Output: 1\n- Input: [-3, -7, -1] → Output: -7\n- Input: [42] → Output: 42",
+  "starterCode": "function findMin(nums) {\n  // your code here\n}",
+  "solutionCode": "function findMin(nums) {\n  let min = nums[0];\n  for (let i = 1; i < nums.length; i++) {\n    if (nums[i] < min) min = nums[i];\n  }\n  return min;\n}",
+  "testCases": [
+    { "input": [[5, 3, 8, 1, 9]], "expected": 1, "description": "finds min in mixed numbers", "isEdgeCase": false },
+    { "input": [[-3, -7, -1]], "expected": -7, "description": "finds min in negative numbers", "isEdgeCase": false },
+    { "input": [[42]], "expected": 42, "description": "single element", "isEdgeCase": true },
+    { "input": [[5, 5, 5]], "expected": 5, "description": "all same elements", "isEdgeCase": true },
+    { "input": [[0, -1, 1]], "expected": -1, "description": "mix with zero", "isEdgeCase": false }
+  ],
+  "tier": 1,
+  "categoryId": "cat-sorting",
+  "hints": ["Start by assuming the first element is the minimum.", "Loop through and update whenever you find something smaller."],
+  "timeLimit": 180,
+  "patterns": ["pat-accumulator"]
+}

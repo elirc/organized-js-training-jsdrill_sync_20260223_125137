@@ -1,0 +1,19 @@
+{
+  "id": "prob-arr-t1-find-max",
+  "title": "Find the Maximum",
+  "description": "Write a function that returns the largest number in an array of numbers.\n\nExample:\n- Input: [1, 5, 3, 9, 2] → Output: 9\n- Input: [-1, -5, -3] → Output: -1\n- Input: [42] → Output: 42",
+  "starterCode": "function findMax(nums) {\n  // your code here\n}",
+  "solutionCode": "function findMax(nums) {\n  let max = nums[0];\n  for (let i = 1; i < nums.length; i++) {\n    if (nums[i] > max) max = nums[i];\n  }\n  return max;\n}",
+  "testCases": [
+    { "input": [[1, 5, 3, 9, 2]], "expected": 9, "description": "finds max in positive numbers", "isEdgeCase": false },
+    { "input": [[-1, -5, -3]], "expected": -1, "description": "finds max in negative numbers", "isEdgeCase": false },
+    { "input": [[42]], "expected": 42, "description": "single element array", "isEdgeCase": true },
+    { "input": [[3, 3, 3]], "expected": 3, "description": "all elements equal", "isEdgeCase": true },
+    { "input": [[0, -1, 1]], "expected": 1, "description": "mix of negative, zero, positive", "isEdgeCase": false }
+  ],
+  "tier": 1,
+  "categoryId": "cat-arrays",
+  "hints": ["Start by assuming the first element is the max.", "Loop through and update whenever you find something larger."],
+  "timeLimit": 180,
+  "patterns": ["pat-accumulator"]
+}

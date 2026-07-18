@@ -1,0 +1,19 @@
+{
+  "id": "prob-arr-t1-sum",
+  "title": "Sum All Elements",
+  "description": "Write a function that returns the sum of all numbers in an array.\n\nExample:\n- Input: [1, 2, 3, 4, 5] → Output: 15\n- Input: [-1, 1] → Output: 0\n- Input: [] → Output: 0",
+  "starterCode": "function sumAll(nums) {\n  // your code here\n}",
+  "solutionCode": "function sumAll(nums) {\n  let sum = 0;\n  for (const num of nums) {\n    sum += num;\n  }\n  return sum;\n}",
+  "testCases": [
+    { "input": [[1, 2, 3, 4, 5]], "expected": 15, "description": "sums positive numbers", "isEdgeCase": false },
+    { "input": [[-1, 1]], "expected": 0, "description": "negatives and positives cancel out", "isEdgeCase": false },
+    { "input": [[]], "expected": 0, "description": "empty array sums to 0", "isEdgeCase": true },
+    { "input": [[100]], "expected": 100, "description": "single element", "isEdgeCase": true },
+    { "input": [[-5, -3, -2]], "expected": -10, "description": "all negative numbers", "isEdgeCase": false }
+  ],
+  "tier": 1,
+  "categoryId": "cat-arrays",
+  "hints": ["Initialize a sum variable to 0.", "Add each element to the sum as you iterate."],
+  "timeLimit": 180,
+  "patterns": ["pat-accumulator"]
+}

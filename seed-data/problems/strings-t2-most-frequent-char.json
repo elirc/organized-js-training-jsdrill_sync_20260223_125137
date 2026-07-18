@@ -1,0 +1,19 @@
+{
+  "id": "prob-str-t2-freq-char",
+  "title": "Most Frequent Character",
+  "description": "Write a function that returns the most frequently occurring character in a string. If there's a tie, return the character that appears first in the string. Ignore spaces.\n\nExample:\n- Input: \"hello\" → Output: \"l\"\n- Input: \"aabbbcc\" → Output: \"b\"\n- Input: \"abab\" → Output: \"a\"",
+  "starterCode": "function mostFrequentChar(str) {\n  // your code here\n}",
+  "solutionCode": "function mostFrequentChar(str) {\n  const freq = {};\n  for (const char of str) {\n    if (char === ' ') continue;\n    freq[char] = (freq[char] || 0) + 1;\n  }\n  let maxChar = '';\n  let maxCount = 0;\n  for (const char of str) {\n    if (char === ' ') continue;\n    if (freq[char] > maxCount) {\n      maxCount = freq[char];\n      maxChar = char;\n    }\n  }\n  return maxChar;\n}",
+  "testCases": [
+    { "input": ["hello"], "expected": "l", "description": "finds most frequent in simple word", "isEdgeCase": false },
+    { "input": ["aabbbcc"], "expected": "b", "description": "finds character with highest count", "isEdgeCase": false },
+    { "input": ["abab"], "expected": "a", "description": "returns first char on tie", "isEdgeCase": false },
+    { "input": ["x"], "expected": "x", "description": "single character", "isEdgeCase": true },
+    { "input": ["a b a"], "expected": "a", "description": "ignores spaces", "isEdgeCase": false }
+  ],
+  "tier": 2,
+  "categoryId": "cat-strings",
+  "hints": ["Build a frequency map counting each character.", "Iterate through the string again to find the first character with the max count."],
+  "timeLimit": 240,
+  "patterns": ["pat-frequency-map", "pat-string-traversal"]
+}

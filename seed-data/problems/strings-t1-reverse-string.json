@@ -1,0 +1,19 @@
+{
+  "id": "prob-str-t1-reverse",
+  "title": "Reverse a String",
+  "description": "Write a function that takes a string and returns it reversed.\n\nExample:\n- Input: \"hello\" → Output: \"olleh\"\n- Input: \"world\" → Output: \"dlrow\"\n- Input: \"\" → Output: \"\"",
+  "starterCode": "function reverseString(str) {\n  // your code here\n}",
+  "solutionCode": "function reverseString(str) {\n  let result = '';\n  for (let i = str.length - 1; i >= 0; i--) {\n    result += str[i];\n  }\n  return result;\n}",
+  "testCases": [
+    { "input": ["hello"], "expected": "olleh", "description": "reverses a simple word", "isEdgeCase": false },
+    { "input": ["world"], "expected": "dlrow", "description": "reverses another word", "isEdgeCase": false },
+    { "input": ["a"], "expected": "a", "description": "single character stays the same", "isEdgeCase": true },
+    { "input": [""], "expected": "", "description": "empty string returns empty", "isEdgeCase": true },
+    { "input": ["racecar"], "expected": "racecar", "description": "palindrome reverses to itself", "isEdgeCase": false }
+  ],
+  "tier": 1,
+  "categoryId": "cat-strings",
+  "hints": ["Think about iterating from the end of the string to the beginning.", "You can build a new string character by character."],
+  "timeLimit": 180,
+  "patterns": ["pat-two-pointer", "pat-string-traversal"]
+}

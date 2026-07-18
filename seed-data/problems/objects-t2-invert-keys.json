@@ -1,0 +1,18 @@
+{
+  "id": "prob-obj-t2-invert",
+  "title": "Invert Key/Values",
+  "description": "Write a function that swaps the keys and values of an object. If multiple keys have the same value, the last key wins.\n\nExample:\n- Input: { a: 1, b: 2, c: 3 } → Output: { 1: \"a\", 2: \"b\", 3: \"c\" }\n- Input: { x: \"hello\", y: \"world\" } → Output: { hello: \"x\", world: \"y\" }",
+  "starterCode": "function invertObject(obj) {\n  // your code here\n}",
+  "solutionCode": "function invertObject(obj) {\n  const result = {};\n  for (const [key, value] of Object.entries(obj)) {\n    result[value] = key;\n  }\n  return result;\n}",
+  "testCases": [
+    { "input": [{ "a": 1, "b": 2, "c": 3 }], "expected": { "1": "a", "2": "b", "3": "c" }, "description": "inverts string→number to number→string", "isEdgeCase": false },
+    { "input": [{ "x": "hello", "y": "world" }], "expected": { "hello": "x", "world": "y" }, "description": "inverts string→string", "isEdgeCase": false },
+    { "input": [{}], "expected": {}, "description": "empty object", "isEdgeCase": true },
+    { "input": [{ "a": 1, "b": 1 }], "expected": { "1": "b" }, "description": "duplicate values - last key wins", "isEdgeCase": true }
+  ],
+  "tier": 2,
+  "categoryId": "cat-objects",
+  "hints": ["Use Object.entries() to iterate over key-value pairs.", "For each pair, set the value as the new key and the key as the new value."],
+  "timeLimit": 240,
+  "patterns": ["pat-accumulator"]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "prob-rec-t2-deep-search",
+  "title": "Deep Object Search",
+  "description": "Write a function that searches a nested object for a given key and returns its value. The object can be nested to any depth. If the key appears multiple times, return the first value found (depth-first). Return undefined if the key is not found.\n\nExample:\n- Input: { a: { b: { target: 42 } } }, \"target\" → Output: 42\n- Input: { x: 1, y: { z: 2 } }, \"z\" → Output: 2",
+  "starterCode": "function deepSearch(obj, targetKey) {\n  // your code here\n}",
+  "solutionCode": "function deepSearch(obj, targetKey) {\n  if (typeof obj !== 'object' || obj === null) return undefined;\n  if (targetKey in obj) return obj[targetKey];\n  for (const key of Object.keys(obj)) {\n    if (typeof obj[key] === 'object' && obj[key] !== null) {\n      const result = deepSearch(obj[key], targetKey);\n      if (result !== undefined) return result;\n    }\n  }\n  return undefined;\n}",
+  "testCases": [
+    { "input": [{ "a": { "b": { "target": 42 } } }, "target"], "expected": 42, "description": "finds deeply nested key", "isEdgeCase": false },
+    { "input": [{ "x": 1, "y": { "z": 2 } }, "z"], "expected": 2, "description": "finds key in nested object", "isEdgeCase": false },
+    { "input": [{ "a": 1 }, "b"], "expected": null, "description": "key not found returns undefined", "isEdgeCase": true },
+    { "input": [{ "a": { "a": { "a": "deep" } } }, "a"], "expected": { "a": { "a": "deep" } }, "description": "returns first match (depth-first)", "isEdgeCase": false },
+    { "input": [{}, "anything"], "expected": null, "description": "empty object", "isEdgeCase": true }
+  ],
+  "tier": 2,
+  "categoryId": "cat-recursion",
+  "hints": ["First check if the key exists at the current level.", "If not, iterate through values that are objects and recursively search each one."],
+  "timeLimit": 300,
+  "patterns": ["pat-deep-traversal", "pat-recursion-base"]
+}

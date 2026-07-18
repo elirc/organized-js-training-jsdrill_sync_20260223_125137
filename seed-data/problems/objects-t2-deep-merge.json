@@ -1,0 +1,19 @@
+{
+  "id": "prob-obj-t2-deep-merge",
+  "title": "Deep Merge Two Objects",
+  "description": "Write a function that deeply merges two objects. Properties from the second object overwrite the first. Nested objects should be merged recursively, not replaced.\n\nExample:\n- Input: { a: 1, b: { x: 1 } }, { b: { y: 2 }, c: 3 }\n- Output: { a: 1, b: { x: 1, y: 2 }, c: 3 }",
+  "starterCode": "function deepMerge(obj1, obj2) {\n  // your code here\n}",
+  "solutionCode": "function deepMerge(obj1, obj2) {\n  const result = { ...obj1 };\n  for (const key of Object.keys(obj2)) {\n    if (\n      obj2[key] && typeof obj2[key] === 'object' && !Array.isArray(obj2[key]) &&\n      result[key] && typeof result[key] === 'object' && !Array.isArray(result[key])\n    ) {\n      result[key] = deepMerge(result[key], obj2[key]);\n    } else {\n      result[key] = obj2[key];\n    }\n  }\n  return result;\n}",
+  "testCases": [
+    { "input": [{ "a": 1, "b": { "x": 1 } }, { "b": { "y": 2 }, "c": 3 }], "expected": { "a": 1, "b": { "x": 1, "y": 2 }, "c": 3 }, "description": "merges nested objects", "isEdgeCase": false },
+    { "input": [{ "a": 1 }, { "a": 2 }], "expected": { "a": 2 }, "description": "second object overwrites primitive", "isEdgeCase": false },
+    { "input": [{}, { "a": 1 }], "expected": { "a": 1 }, "description": "merge into empty object", "isEdgeCase": true },
+    { "input": [{ "a": { "b": { "c": 1 } } }, { "a": { "b": { "d": 2 } } }], "expected": { "a": { "b": { "c": 1, "d": 2 } } }, "description": "deeply nested merge", "isEdgeCase": false },
+    { "input": [{ "a": [1, 2] }, { "a": [3, 4] }], "expected": { "a": [3, 4] }, "description": "arrays are replaced, not merged", "isEdgeCase": true }
+  ],
+  "tier": 2,
+  "categoryId": "cat-objects",
+  "hints": ["Start with a shallow copy of the first object.", "For each key in obj2, check if both values are plain objects — if so, recurse. Otherwise, just overwrite."],
+  "timeLimit": 360,
+  "patterns": ["pat-deep-traversal", "pat-recursion-base"]
+}
