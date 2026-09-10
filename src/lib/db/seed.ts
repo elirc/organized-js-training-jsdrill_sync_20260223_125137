@@ -1,243 +1,170 @@
 import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import * as schema from "./schema";
 import path from "path";
-import fs from "fs";
+import { DDL, DEFAULT_USER_ID } from "./ddl";
+import { itemId, loadContentFiles, moduleId, validateAll } from "./contentFiles";
 
-const dbPath = path.join(process.cwd(), "reps.db");
+/**
+ * Loads seed-data/content/*.json into the database.
+ *
+ * Re-runnable: content is upserted under an id derived from the track and
+ * module slugs plus the item's position, so editing an explanation or adding a
+ * question leaves review schedules untouched. Items that disappear from the
+ * content files are deleted, which cascades to their cards — deliberate, but
+ * the script reports the count so it can't happen quietly.
+ */
+
+const dbPath = process.env.RAMP_DB_PATH ?? path.join(process.cwd(), "ramp.db");
 const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
-
-const db = drizzle(sqlite, { schema });
+sqlite.exec(DDL);
 
 function seed() {
-  const seedDir = path.join(process.cwd(), "seed-data");
-  const now = new Date().toISOString();
+  const { errors } = validateAll();
+  if (errors.length > 0) {
+    console.warn(`\n${errors.length} content warning(s) — seeding anyway:`);
+    for (const error of errors.slice(0, 20)) console.warn(`  - ${error}`);
+    if (errors.length > 20) console.warn(`  … and ${errors.length - 20} more`);
+  }
 
-  // Create tables if they don't exist
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS categories (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      icon TEXT NOT NULL DEFAULT '',
-      sort_order INTEGER NOT NULL DEFAULT 0
-    );
+  const files = loadContentFiles();
+  const timestamp = new Date().toISOString();
+  const seenItemIds = new Set<string>();
+  let trackCount = 0;
+  let moduleCount = 0;
+  let itemCount = 0;
 
-    CREATE TABLE IF NOT EXISTS patterns (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      slug TEXT NOT NULL UNIQUE,
-      description TEXT NOT NULL DEFAULT '',
-      explanation TEXT NOT NULL DEFAULT ''
-    );
-
-    CREATE TABLE IF NOT EXISTS problems (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      description TEXT NOT NULL,
-      starter_code TEXT NOT NULL,
-      solution_code TEXT NOT NULL DEFAULT '',
-      test_cases TEXT NOT NULL DEFAULT '[]',
-      tier INTEGER NOT NULL DEFAULT 1,
-      category_id TEXT NOT NULL REFERENCES categories(id),
-      author_id TEXT,
-      hints TEXT NOT NULL DEFAULT '[]',
-      time_limit INTEGER NOT NULL DEFAULT 300,
-      is_published INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS problem_patterns (
-      problem_id TEXT NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
-      pattern_id TEXT NOT NULL REFERENCES patterns(id) ON DELETE CASCADE,
-      PRIMARY KEY (problem_id, pattern_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL UNIQUE,
-      daily_goal INTEGER NOT NULL DEFAULT 10,
-      streak_count INTEGER NOT NULL DEFAULT 0,
-      settings TEXT NOT NULL DEFAULT '{}',
-      created_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS attempts (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      problem_id TEXT NOT NULL REFERENCES problems(id),
-      code TEXT NOT NULL,
-      approach_text TEXT NOT NULL DEFAULT '',
-      passed INTEGER NOT NULL DEFAULT 0,
-      time_spent INTEGER NOT NULL DEFAULT 0,
-      timed_mode INTEGER NOT NULL DEFAULT 0,
-      error_type TEXT,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS user_cards (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      problem_id TEXT NOT NULL REFERENCES problems(id),
-      stability REAL NOT NULL DEFAULT 0,
-      difficulty REAL NOT NULL DEFAULT 0,
-      due TEXT NOT NULL,
-      reps INTEGER NOT NULL DEFAULT 0,
-      lapses INTEGER NOT NULL DEFAULT 0,
-      state INTEGER NOT NULL DEFAULT 0,
-      last_review TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS user_tier_progress (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      category_id TEXT NOT NULL REFERENCES categories(id),
-      current_tier INTEGER NOT NULL DEFAULT 1,
-      tier_unlocked_at TEXT NOT NULL,
-      consecutive_pass INTEGER NOT NULL DEFAULT 0,
-      last_decay_check TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS user_problem_versions (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      original_problem_id TEXT NOT NULL REFERENCES problems(id),
-      title TEXT NOT NULL,
-      description TEXT NOT NULL,
-      starter_code TEXT NOT NULL,
-      solution_code TEXT NOT NULL DEFAULT '',
-      test_cases TEXT NOT NULL DEFAULT '[]',
-      hints TEXT NOT NULL DEFAULT '[]',
-      notes TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS shared_items (
-      id TEXT PRIMARY KEY,
-      share_code TEXT NOT NULL UNIQUE,
-      owner_id TEXT NOT NULL REFERENCES users(id),
-      item_type TEXT NOT NULL,
-      item_id TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS problem_sets (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      name TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS problem_set_items (
-      problem_set_id TEXT NOT NULL REFERENCES problem_sets(id) ON DELETE CASCADE,
-      problem_id TEXT NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      PRIMARY KEY (problem_set_id, problem_id)
-    );
+  const upsertTrack = sqlite.prepare(`
+    INSERT INTO tracks (id, name, slug, tagline, description, icon, accent, sort_order)
+    VALUES (@id, @name, @slug, @tagline, @description, @icon, @accent, @sortOrder)
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name, slug = excluded.slug, tagline = excluded.tagline,
+      description = excluded.description, icon = excluded.icon,
+      accent = excluded.accent, sort_order = excluded.sort_order
   `);
 
-  // Seed categories
-  const categoriesData = JSON.parse(
-    fs.readFileSync(path.join(seedDir, "categories.json"), "utf-8")
-  );
-  for (const cat of categoriesData) {
-    db.insert(schema.categories)
-      .values(cat)
-      .onConflictDoNothing()
-      .run();
-  }
-  console.log(`Seeded ${categoriesData.length} categories`);
+  const upsertModule = sqlite.prepare(`
+    INSERT INTO modules (id, track_id, name, slug, summary, level, key_points, interview_angle, sort_order)
+    VALUES (@id, @trackId, @name, @slug, @summary, @level, @keyPoints, @interviewAngle, @sortOrder)
+    ON CONFLICT(id) DO UPDATE SET
+      track_id = excluded.track_id, name = excluded.name, slug = excluded.slug,
+      summary = excluded.summary, level = excluded.level, key_points = excluded.key_points,
+      interview_angle = excluded.interview_angle, sort_order = excluded.sort_order
+  `);
 
-  // Seed patterns
-  const patternsData = JSON.parse(
-    fs.readFileSync(path.join(seedDir, "patterns.json"), "utf-8")
-  );
-  for (const pat of patternsData) {
-    db.insert(schema.patterns)
-      .values(pat)
-      .onConflictDoNothing()
-      .run();
-  }
-  console.log(`Seeded ${patternsData.length} patterns`);
+  const upsertItem = sqlite.prepare(`
+    INSERT INTO items (
+      id, module_id, track_id, type, difficulty, frequency, tags, prompt, code, language,
+      choices, answer, explanation, follow_up, keywords, model_answer,
+      starter_code, solution_code, test_cases, est_seconds, sort_order, is_published,
+      created_at, updated_at
+    ) VALUES (
+      @id, @moduleId, @trackId, @type, @difficulty, @frequency, @tags, @prompt, @code, @language,
+      @choices, @answer, @explanation, @followUp, @keywords, @modelAnswer,
+      @starterCode, @solutionCode, @testCases, @estSeconds, @sortOrder, 1,
+      @now, @now
+    )
+    ON CONFLICT(id) DO UPDATE SET
+      module_id = excluded.module_id, track_id = excluded.track_id, type = excluded.type,
+      difficulty = excluded.difficulty, frequency = excluded.frequency, tags = excluded.tags,
+      prompt = excluded.prompt, code = excluded.code, language = excluded.language,
+      choices = excluded.choices, answer = excluded.answer, explanation = excluded.explanation,
+      follow_up = excluded.follow_up, keywords = excluded.keywords,
+      model_answer = excluded.model_answer, starter_code = excluded.starter_code,
+      solution_code = excluded.solution_code, test_cases = excluded.test_cases,
+      est_seconds = excluded.est_seconds, sort_order = excluded.sort_order,
+      updated_at = excluded.updated_at
+  `);
 
-  // Seed problems
-  const problemsDir = path.join(seedDir, "problems");
-  const problemFiles = fs.readdirSync(problemsDir).filter((f) => f.endsWith(".json"));
-  let problemCount = 0;
+  const load = sqlite.transaction(() => {
+    for (const content of files) {
+      const track = content.track;
 
-  for (const file of problemFiles) {
-    const data = JSON.parse(
-      fs.readFileSync(path.join(problemsDir, file), "utf-8")
-    );
-    const { patterns: patternIds, ...problem } = data;
+      upsertTrack.run({
+        id: track.id,
+        name: track.name,
+        slug: track.slug,
+        tagline: track.tagline ?? "",
+        description: track.description ?? "",
+        icon: track.icon ?? "",
+        accent: track.accent ?? "slate",
+        sortOrder: track.sortOrder ?? 0,
+      });
+      trackCount++;
 
-    db.insert(schema.problems)
-      .values({
-        ...problem,
-        testCases: JSON.stringify(problem.testCases),
-        hints: JSON.stringify(problem.hints),
-        authorId: null,
-        isPublished: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoNothing()
-      .run();
+      content.modules.forEach((mod, moduleIndex) => {
+        const id = moduleId(track.slug, mod.slug);
 
-    // Link patterns
-    if (patternIds) {
-      for (const patternId of patternIds) {
-        db.insert(schema.problemPatterns)
-          .values({ problemId: problem.id, patternId })
-          .onConflictDoNothing()
-          .run();
-      }
+        upsertModule.run({
+          id,
+          trackId: track.id,
+          name: mod.name,
+          slug: mod.slug,
+          summary: mod.summary ?? "",
+          level: mod.level ?? "foundation",
+          keyPoints: JSON.stringify(mod.keyPoints ?? []),
+          interviewAngle: mod.interviewAngle ?? "",
+          sortOrder: moduleIndex,
+        });
+        moduleCount++;
+
+        mod.items.forEach((item, index) => {
+          const key = item.id ?? itemId(track.slug, mod.slug, index);
+          if (seenItemIds.has(key)) return; // already reported by validateAll
+          seenItemIds.add(key);
+
+          upsertItem.run({
+            id: key,
+            moduleId: id,
+            trackId: track.id,
+            type: item.type,
+            difficulty: item.difficulty ?? 1,
+            frequency: item.frequency ?? 2,
+            tags: JSON.stringify(item.tags ?? []),
+            prompt: item.prompt,
+            code: item.code ?? "",
+            language: item.language ?? "js",
+            choices: JSON.stringify(item.choices ?? []),
+            answer: JSON.stringify(item.answer ?? null),
+            explanation: item.explanation ?? "",
+            followUp: item.followUp ?? "",
+            keywords: JSON.stringify(item.keywords ?? []),
+            modelAnswer: item.modelAnswer ?? "",
+            starterCode: item.starterCode ?? "",
+            solutionCode: item.solutionCode ?? "",
+            testCases: JSON.stringify(item.testCases ?? []),
+            estSeconds: item.estSeconds ?? 45,
+            sortOrder: index,
+            now: timestamp,
+          });
+          itemCount++;
+        });
+      });
     }
 
-    problemCount++;
-  }
-  console.log(`Seeded ${problemCount} problems`);
+    // Retire content that's been removed from the files.
+    const existing = sqlite.prepare("SELECT id FROM items").all() as { id: string }[];
+    const stale = existing.filter((row) => !seenItemIds.has(row.id));
+    if (stale.length > 0) {
+      const del = sqlite.prepare("DELETE FROM items WHERE id = ?");
+      for (const row of stale) del.run(row.id);
+      console.log(`Removed ${stale.length} item(s) no longer present in the content files`);
+    }
+  });
 
-  // Create default user for Phase 1
-  db.insert(schema.users)
-    .values({
-      id: "default-user",
-      name: "Developer",
-      email: "dev@reps.local",
-      dailyGoal: 10,
-      streakCount: 0,
-      settings: "{}",
-      createdAt: now,
-    })
-    .onConflictDoNothing()
-    .run();
-  console.log("Created default user");
+  load();
 
-  // Create default tier progress for each category
-  for (const cat of categoriesData) {
-    db.insert(schema.userTierProgress)
-      .values({
-        id: `utp-default-${cat.id}`,
-        userId: "default-user",
-        categoryId: cat.id,
-        currentTier: 1,
-        tierUnlockedAt: now,
-        consecutivePass: 0,
-        lastDecayCheck: now,
-      })
-      .onConflictDoNothing()
-      .run();
-  }
-  console.log("Created default tier progress");
+  sqlite
+    .prepare(
+      `INSERT OR IGNORE INTO users (id, name, email, daily_goal, settings, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(DEFAULT_USER_ID, "You", "you@ramp.local", 20, "{}", timestamp);
 
+  console.log(
+    `\nSeeded ${trackCount} tracks, ${moduleCount} modules, ${itemCount} items → ${dbPath}\n`
+  );
   sqlite.close();
-  console.log("Seed complete!");
 }
 
 seed();

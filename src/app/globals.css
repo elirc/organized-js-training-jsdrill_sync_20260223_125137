@@ -1,19 +1,92 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+/*
+ * Tailwind v4 defaults `dark:` to prefers-color-scheme. We want an explicit
+ * toggle as well, so redefine the variant to key off a class on <html>.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-code), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --page: #f1f5f9;
+  --ink: #0f172a;
+  --ink-muted: #64748b;
+  --line: #e2e8f0;
+}
+
+.dark {
+  --surface: #131a29;
+  --surface-muted: #0d131f;
+  --page: #080c14;
+  --ink: #e8edf7;
+  --ink-muted: #8b9bb4;
+  --line: #23304a;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Semantic helpers so components don't repeat the same six utility classes. */
+@layer components {
+  .surface {
+    background: var(--surface);
+    border-color: var(--line);
+  }
+  .ink-muted {
+    color: var(--ink-muted);
+  }
+  .hairline {
+    border-color: var(--line);
+  }
+}
+
+/* Code blocks: one look for every snippet, in both themes. */
+.snippet {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  tab-size: 2;
+}
+
+/* CodeMirror needs a little help to sit flush inside a rounded card. */
+.cm-editor {
+  height: 100%;
+}
+.cm-editor.cm-focused {
+  outline: none;
+}
+.cm-scroller {
+  font-family: var(--font-mono) !important;
+  font-size: 0.8125rem !important;
+}
+
+/* Respect a user's reduced-motion preference for the progress animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Keyboard-only focus rings — the drill is heavily keyboard-driven. */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+::selection {
+  background: #6366f1;
+  color: white;
 }

@@ -1,98 +1,158 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/Nav";
+import { getTracks } from "@/lib/content";
+import { accent } from "@/lib/theme";
+import { cn } from "@/lib/utils";
+import type { Track } from "@/types";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+const STEPS = [
+  {
+    title: "Answer a real interview question",
+    body: "Multiple choice, predict-the-output, fill the blanks, order the steps, write the code, or explain a concept out loud. Seven formats, because that's how you actually get asked.",
+  },
+  {
+    title: "Find out why, not just whether",
+    body: "Every answer comes with the reasoning, the trap it's testing, and the follow-up question an interviewer would ask next.",
+  },
+  {
+    title: "See it again exactly when you'd forget",
+    body: "A spaced-repetition scheduler brings back what's fading and leaves alone what's stuck. Your progress decays if you stop, because so does your recall.",
+  },
+];
+
+export default function Landing() {
+  let tracks: Track[] = [];
+  try {
+    tracks = getTracks();
+  } catch {
+    // Unseeded database — the hero still renders and the setup note shows.
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Nav */}
-      <nav className="border-b border-gray-200 bg-white">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <span className="text-xl font-bold text-indigo-600">Reps</span>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/app"
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              Practice
-            </Link>
-            <Link
-              href="/app/dashboard"
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/admin"
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              Admin
-            </Link>
-          </div>
+      <header className="border-b hairline">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-4">
+          <span className="font-semibold tracking-tight">Ramp</span>
+          <ThemeToggle />
         </div>
-      </nav>
+      </header>
 
-      {/* Hero */}
-      <main className="flex-1 flex items-center justify-center">
-        <div className="max-w-2xl mx-auto px-4 text-center space-y-8">
-          <h1 className="text-5xl font-bold text-gray-900 tracking-tight">
-            Build coding fluency
-            <br />
-            <span className="text-indigo-600">one rep at a time</span>
-          </h1>
-          <p className="text-lg text-gray-600 max-w-xl mx-auto">
-            Spaced repetition meets coding practice. Master patterns, not
-            problems. Think first, code second. Go from novice to
-            interview-ready.
-          </p>
-          <div className="flex items-center justify-center gap-4">
-            <Link
-              href="/app"
-              className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
-            >
-              Start Practicing →
-            </Link>
-            <Link
-              href="/app/dashboard"
-              className="inline-flex items-center px-6 py-3 bg-white text-gray-700 font-semibold rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
-            >
-              View Dashboard
-            </Link>
-          </div>
-
-          {/* Features */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12 text-left">
-            <div className="p-5 rounded-xl border border-gray-200 bg-white">
-              <div className="text-2xl mb-2">🧠</div>
-              <h3 className="font-semibold text-gray-900 mb-1">
-                Think First
-              </h3>
-              <p className="text-sm text-gray-600">
-                Describe your approach before coding. Build the interview habit
-                of planning before implementation.
-              </p>
-            </div>
-            <div className="p-5 rounded-xl border border-gray-200 bg-white">
-              <div className="text-2xl mb-2">🔄</div>
-              <h3 className="font-semibold text-gray-900 mb-1">
-                Spaced Repetition
-              </h3>
-              <p className="text-sm text-gray-600">
-                The algorithm schedules your reviews at optimal intervals.
-                Problems you struggle with come back sooner.
-              </p>
-            </div>
-            <div className="p-5 rounded-xl border border-gray-200 bg-white">
-              <div className="text-2xl mb-2">🏷️</div>
-              <h3 className="font-semibold text-gray-900 mb-1">
-                Pattern Recognition
-              </h3>
-              <p className="text-sm text-gray-600">
-                Every problem reveals its pattern. Build a mental library of
-                reusable approaches, not memorized solutions.
-              </p>
+      <main className="flex-1">
+        {/* Hero */}
+        <section className="max-w-5xl mx-auto px-4 pt-16 pb-14">
+          <div className="max-w-2xl">
+            <p className="text-xs font-medium uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-4">
+              JavaScript · TypeScript · React · Node · C# · .NET
+            </p>
+            <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.1]">
+              Get from &ldquo;I can follow a tutorial&rdquo; to
+              <br />
+              <span className="text-indigo-600 dark:text-indigo-400">
+                mid-level CRUD developer
+              </span>
+            </h1>
+            <p className="mt-6 text-base leading-relaxed ink-muted">
+              A structured path through the things interviewers actually ask about this stack — how
+              closures work, why your effect runs twice, what N+1 is, which DI lifetime a DbContext
+              needs. No LeetCode. No binary trees. Just the working knowledge the job assumes you
+              have.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link
+                href="/learn"
+                className="inline-flex items-center px-5 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-colors"
+              >
+                See the roadmap
+              </Link>
+              <Link
+                href="/drill"
+                className="inline-flex items-center px-5 py-2.5 rounded-lg border hairline surface text-sm font-medium hover:bg-[var(--surface-muted)] transition-colors"
+              >
+                Start practising →
+              </Link>
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* Tracks */}
+        {tracks.length > 0 && (
+          <section className="max-w-5xl mx-auto px-4 pb-16">
+            <h2 className="text-xs font-medium uppercase tracking-widest ink-muted mb-5">
+              Seven tracks, in order
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {tracks.map((track, i) => {
+                const tone = accent(track.accent);
+                return (
+                  <Link
+                    key={track.id}
+                    href={`/learn/${track.slug}`}
+                    className="group surface border rounded-xl p-4 hover:border-indigo-400 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <span
+                        className={cn(
+                          "h-7 w-7 rounded-lg grid place-items-center text-[11px] font-bold",
+                          tone.bgSoft,
+                          tone.text
+                        )}
+                      >
+                        {track.icon}
+                      </span>
+                      <span className="font-medium text-sm">{track.name}</span>
+                      <span className="ml-auto text-[11px] ink-muted tabular-nums">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <p className="text-xs ink-muted leading-relaxed">{track.tagline}</p>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* How it works */}
+        <section className="border-t hairline bg-[var(--surface)]">
+          <div className="max-w-5xl mx-auto px-4 py-16">
+            <h2 className="text-xs font-medium uppercase tracking-widest ink-muted mb-8">
+              How a session works
+            </h2>
+            <div className="grid gap-8 md:grid-cols-3">
+              {STEPS.map((step, i) => (
+                <div key={step.title}>
+                  <span className="text-xs font-mono ink-muted">0{i + 1}</span>
+                  <h3 className="font-medium mt-2 mb-2">{step.title}</h3>
+                  <p className="text-sm ink-muted leading-relaxed">{step.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Setup note when the DB is empty */}
+        {tracks.length === 0 && (
+          <section className="max-w-5xl mx-auto px-4 py-12">
+            <div className="surface border rounded-xl p-6">
+              <h2 className="font-medium mb-2">One step before you start</h2>
+              <p className="text-sm ink-muted mb-4">
+                The content database hasn&apos;t been seeded yet. Run this once:
+              </p>
+              <pre className="snippet rounded-lg border hairline bg-[var(--surface-muted)] p-3">
+                npm run db:seed
+              </pre>
+            </div>
+          </section>
+        )}
       </main>
+
+      <footer className="border-t hairline">
+        <div className="max-w-5xl mx-auto px-4 py-6 text-xs ink-muted">
+          Runs locally on SQLite. Your answers and schedule never leave the machine.
+        </div>
+      </footer>
     </div>
   );
 }

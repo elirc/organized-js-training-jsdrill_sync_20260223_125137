@@ -1,0 +1,1217 @@
+{
+  "track": {
+    "id": "trk-javascript",
+    "slug": "javascript",
+    "name": "JavaScript",
+    "tagline": "The language every job on this stack assumes you already know",
+    "description": "Values and coercion, scope and closures, the array and object methods you use every day, and the async model. This is the track interviewers use to find out whether you actually understand the language or just pattern-match on syntax.",
+    "icon": "JS",
+    "accent": "amber",
+    "sortOrder": 1
+  },
+  "modules": [
+    {
+      "slug": "values-and-types",
+      "name": "Values, Types & Coercion",
+      "level": "foundation",
+      "summary": "What the seven primitives are, how == differs from ===, and why 0.1 + 0.2 isn't 0.3.",
+      "interviewAngle": "Almost every screen opens with a coercion or typeof question. It's not about the trivia — they're checking whether you'll write == in a codebase and cause a bug at 2am.",
+      "keyPoints": [
+        "Primitives are copied by value; objects, arrays and functions are copied by reference",
+        "=== compares without coercion; == runs the abstract equality algorithm first",
+        "typeof null is \"object\" — a bug from 1995 that can never be fixed",
+        "Numbers are IEEE-754 doubles, so decimal arithmetic has rounding error",
+        "null is an assigned absence; undefined is an unassigned one",
+        "?? falls back only on null/undefined, || falls back on any falsy value"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": [
+            "types",
+            "typeof"
+          ],
+          "prompt": "What does `typeof null` return?",
+          "choices": [
+            "\"null\"",
+            "\"object\"",
+            "\"undefined\"",
+            "It throws a TypeError"
+          ],
+          "answer": 1,
+          "explanation": "`typeof null` is `\"object\"`. It's a bug in the very first JavaScript implementation: values were tagged with a type in their low bits, and the null pointer (all zeroes) shared the object tag. Fixing it would break too much existing code, so it's permanent. To actually test for null, use `value === null`.",
+          "followUp": "So how would you write a check that means 'this is a real object, not null and not an array'?",
+          "estSeconds": 20
+        },
+        {
+          "type": "predict",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": [
+            "numbers",
+            "floating-point"
+          ],
+          "prompt": "What does this log?",
+          "code": "console.log(0.1 + 0.2);",
+          "language": "js",
+          "answer": "0.30000000000000004",
+          "explanation": "JavaScript numbers are IEEE-754 64-bit floats. 0.1 and 0.2 have no exact binary representation, so the sum carries a tiny rounding error. This is why you never store money as a float — use integer cents, or a decimal library. To compare, check `Math.abs(a - b) < Number.EPSILON`.",
+          "followUp": "You're building a checkout total. How do you store and add up the prices?",
+          "estSeconds": 30
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "coercion",
+            "equality"
+          ],
+          "prompt": "Which of these evaluate to `true`? Select all that apply.",
+          "choices": [
+            "'' == 0",
+            "null == undefined",
+            "null === undefined",
+            "[] == false",
+            "NaN == NaN"
+          ],
+          "answer": [
+            0,
+            1,
+            3
+          ],
+          "explanation": "`'' == 0` — the string coerces to the number 0. `null == undefined` is a special case hardcoded in the spec, but `===` keeps them distinct. `[] == false` — the array becomes `''`, then `0`, and `false` becomes `0`. `NaN` is never equal to anything, including itself. The lesson isn't to memorise the table; it's to use `===` and never think about it again.",
+          "followUp": "Is there any case where you'd deliberately reach for `==`?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 2,
+          "tags": [
+            "references",
+            "mutation"
+          ],
+          "prompt": "What does this log?",
+          "code": "function update(user) {\n  user.name = 'Bea';\n  user = { name: 'Cy' };\n}\n\nconst person = { name: 'Al' };\nupdate(person);\nconsole.log(person.name);",
+          "language": "js",
+          "choices": [
+            "'Al'",
+            "'Bea'",
+            "'Cy'",
+            "undefined"
+          ],
+          "answer": 1,
+          "explanation": "JavaScript is pass-by-value, but the value passed for an object is a *reference*. Mutating through that reference (`user.name = 'Bea'`) changes the original. Reassigning the parameter (`user = {...}`) only rebinds the local variable — the caller never sees it. This is the single most common source of 'why did my state change?' bugs in React.",
+          "followUp": "How would you write `update` so the caller's object is never touched?",
+          "estSeconds": 45
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "arrays",
+            "sort",
+            "gotcha"
+          ],
+          "prompt": "What does this log?",
+          "code": "console.log([10, 9, 1].sort());",
+          "language": "js",
+          "answer": "[1, 10, 9]",
+          "explanation": "`Array.prototype.sort` with no comparator converts every element to a string and sorts lexicographically — so \"10\" comes before \"9\". Always pass a comparator for numbers: `.sort((a, b) => a - b)`. Note also that `sort` mutates in place and returns the same array; use `.toSorted()` (ES2023) or `[...arr].sort()` when you need a copy.",
+          "followUp": "How would you sort an array of objects by date, newest first?",
+          "estSeconds": 30
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "nullish",
+            "defaults"
+          ],
+          "prompt": "A user's `pageSize` may legitimately be `0` (meaning 'no limit'), and should fall back to 25 only when it wasn't supplied at all. Fill in the operator.",
+          "code": "const pageSize = options.pageSize ___ 25;",
+          "language": "js",
+          "choices": [],
+          "answer": [
+            "??"
+          ],
+          "explanation": "`||` falls back on every falsy value — `0`, `''`, `false` — which silently destroys legitimate zero values. `??` only falls back on `null` and `undefined`. This exact bug (a `0` becoming a default) shows up constantly in config and form code, and it's a favourite interview trap.",
+          "followUp": "When would `||` still be the right choice?",
+          "estSeconds": 30
+        },
+        {
+          "type": "explain",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": [
+            "null",
+            "undefined"
+          ],
+          "prompt": "Explain the difference between `null` and `undefined`, and how you'd choose between them in an API response.",
+          "keywords": [
+            "undefined|not assigned|never assigned",
+            "null|deliberate|intentional",
+            "typeof",
+            "default parameter|default",
+            "json"
+          ],
+          "modelAnswer": "`undefined` means a value was never assigned — an uninitialised variable, a missing object property, a parameter you didn't pass, or a function with no return. `null` is a deliberate 'this is empty' that someone assigned on purpose.\n\nPractical differences: `typeof undefined` is `\"undefined\"` while `typeof null` is `\"object\"`; default parameters trigger on `undefined` but not on `null`; and `JSON.stringify` drops `undefined` properties entirely while keeping `null`.\n\nIn an API I'd use `null` for 'this field exists and is empty' (a user with no avatar) and omit the key entirely for 'not applicable', because `undefined` doesn't survive JSON anyway. Consistency matters more than the choice — pick one and document it.",
+          "explanation": "The interviewer wants to see that you know `undefined` is the language's absence and `null` is yours, plus at least one practical consequence (JSON, default params, or typeof).",
+          "followUp": "What happens to an `undefined` property when you `JSON.stringify` an object?",
+          "estSeconds": 90
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "nan",
+            "numbers"
+          ],
+          "prompt": "Which is the correct way to test whether a value is `NaN`?",
+          "choices": [
+            "value === NaN",
+            "isNaN(value)",
+            "Number.isNaN(value)",
+            "typeof value === 'NaN'"
+          ],
+          "answer": 2,
+          "explanation": "`NaN` is the only value not equal to itself, so `===` never works. The global `isNaN()` coerces first, so `isNaN('hello')` is `true` — almost never what you want. `Number.isNaN()` returns `true` only for the actual `NaN` value. (`Object.is(value, NaN)` also works.)",
+          "followUp": "What are some operations that produce `NaN` in the first place?",
+          "estSeconds": 30
+        }
+      ]
+    },
+    {
+      "slug": "scope-and-closures",
+      "name": "Scope, Hoisting & Closures",
+      "level": "foundation",
+      "summary": "How the engine resolves a name, why `var` in a loop surprises everyone, and what `this` binds to.",
+      "interviewAngle": "Closures are the single most-asked JavaScript concept. Interviewers want to hear a definition *and* a real use — a private counter, a memoised function, a React hook capturing state.",
+      "keyPoints": [
+        "A closure is a function plus the scope it was created in, kept alive after that scope returns",
+        "`var` is function-scoped and hoisted as `undefined`; `let`/`const` are block-scoped with a temporal dead zone",
+        "Function declarations are fully hoisted; function expressions are not",
+        "`this` in a normal function is decided at call time; arrow functions inherit it lexically",
+        "Every loop iteration with `let` gets a fresh binding — with `var` they all share one"
+      ],
+      "items": [
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "closures",
+            "var",
+            "loops"
+          ],
+          "prompt": "What does this log?",
+          "code": "for (var i = 0; i < 3; i++) {\n  setTimeout(() => console.log(i), 0);\n}",
+          "language": "js",
+          "answer": "3\n3\n3",
+          "explanation": "`var` is function-scoped, so all three callbacks close over the *same* `i`. The loop finishes before any timeout fires, and by then `i` is 3. Change `var` to `let` and each iteration gets its own binding, logging 0, 1, 2. This is the classic closure question, and it's the same mechanism behind stale-closure bugs in React effects.",
+          "followUp": "Name two ways to fix it without using `let`.",
+          "estSeconds": 45
+        },
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "closures"
+          ],
+          "prompt": "What is a closure? Give a concrete example of one you'd actually write.",
+          "keywords": [
+            "function|inner function",
+            "scope|lexical scope|outer scope",
+            "after|returns|still has access|remembers",
+            "private|encapsulation|state",
+            "counter|memo|cache|handler|hook"
+          ],
+          "modelAnswer": "A closure is a function bundled together with the lexical scope it was defined in. When the outer function returns, its variables would normally be collected — but if an inner function still references them, that scope is kept alive, and the inner function keeps reading and writing the same variables.\n\nThe practical use is private state. A `makeCounter()` that returns `increment` and `get` functions sharing a `count` variable nobody outside can touch. Or memoisation: a `cache` object held in the enclosing scope so repeat calls are free. Or an event handler that captures the id of the row it belongs to.\n\nIt's also why stale-closure bugs happen in React — an effect captures the props from the render it was created in, and unless you add them to the dependency array it keeps seeing those old values forever.",
+          "explanation": "A strong answer defines it (function + scope), says the scope survives the outer call, and names a real use. Mentioning the React stale-closure connection is what separates a mid-level answer from a memorised one.",
+          "followUp": "Do closures leak memory?",
+          "estSeconds": 120
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "hoisting"
+          ],
+          "prompt": "What does this log?",
+          "code": "console.log(typeof declared);\nconsole.log(typeof expressed);\n\nfunction declared() {}\nvar expressed = function () {};",
+          "language": "js",
+          "answer": "function\nundefined",
+          "explanation": "Function declarations are hoisted whole — the name and the body — so `declared` is already a function on line 1. `var expressed` is hoisted as a *binding* initialised to `undefined`; the assignment doesn't happen until the engine reaches that line. Had it been `let expressed`, line 2 would throw a ReferenceError instead, because of the temporal dead zone.",
+          "followUp": "What's the temporal dead zone, and why does `let` have one?",
+          "estSeconds": 45
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "this",
+            "arrow-functions"
+          ],
+          "prompt": "What does this log?",
+          "code": "const counter = {\n  count: 0,\n  incrementAll(items) {\n    items.forEach(function () {\n      this.count++;\n    });\n    return this.count;\n  },\n};\n\nconsole.log(counter.incrementAll([1, 2, 3]));",
+          "language": "js",
+          "choices": [
+            "3",
+            "0",
+            "NaN",
+            "It throws a TypeError"
+          ],
+          "answer": 1,
+          "explanation": "The `function () {}` passed to `forEach` gets its own `this`, which in a module (strict mode) is `undefined` — so `this.count++` would throw. In a plain script it's the global object, so `this.count` is `undefined`, `undefined++` is `NaN`, and the global gets a `count` of `NaN`. Either way `counter.count` is never touched, so the method returns `0`. Fix it with an arrow function, which has no `this` of its own and inherits the method's.",
+          "followUp": "Besides an arrow function, what other two ways could you fix it?",
+          "estSeconds": 60
+        },
+        {
+          "type": "code",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "closures",
+            "factory"
+          ],
+          "prompt": "Write `makeCounter(start)`. It returns an object with `increment()`, `decrement()` and `value()`. The count must not be reachable from outside — only through those methods.",
+          "starterCode": "function makeCounter(start) {\n  // your code here\n}",
+          "solutionCode": "function makeCounter(start) {\n  let count = start;\n  return {\n    increment: () => ++count,\n    decrement: () => --count,\n    value: () => count,\n  };\n}",
+          "language": "js",
+          "testCases": [
+            {
+              "call": "const c = fn(0); return c.value();",
+              "expected": 0,
+              "description": "starts at the given value",
+              "isEdgeCase": false
+            },
+            {
+              "call": "const c = fn(5); c.increment(); c.increment(); return c.value();",
+              "expected": 7,
+              "description": "increment adds to the count",
+              "isEdgeCase": false
+            },
+            {
+              "call": "const c = fn(3); c.decrement(); return c.value();",
+              "expected": 2,
+              "description": "decrement subtracts",
+              "isEdgeCase": false
+            },
+            {
+              "call": "const a = fn(0); const b = fn(100); a.increment(); return b.value();",
+              "expected": 100,
+              "description": "two counters keep separate state",
+              "isEdgeCase": true
+            },
+            {
+              "call": "const c = fn(1); return typeof c.count === 'undefined' && !('count' in c);",
+              "expected": true,
+              "description": "the count is not reachable from outside",
+              "isEdgeCase": true
+            }
+          ],
+          "explanation": "`count` lives in `makeCounter`'s scope. The three returned functions all close over it, so they share one private variable that no caller can reach directly — that's what the last test checks. Each call to `makeCounter` creates a fresh scope, which is why two counters don't interfere.\n\nThis is the module pattern, and it's how you got encapsulation before `#private` class fields existed.",
+          "followUp": "How would you write the same thing with a class and a `#private` field?",
+          "estSeconds": 150
+        },
+        {
+          "type": "predict",
+          "difficulty": 1,
+          "frequency": 2,
+          "tags": [
+            "let",
+            "block-scope"
+          ],
+          "prompt": "What does this log?",
+          "code": "let x = 'outer';\n{\n  let x = 'inner';\n  console.log(x);\n}\nconsole.log(x);",
+          "language": "js",
+          "answer": "inner\nouter",
+          "explanation": "`let` is block-scoped: the inner `x` shadows the outer one only inside the braces. With `var` both lines would print `'inner'`, because `var` ignores blocks and only respects function boundaries.",
+          "followUp": "Where else does block scoping matter in day-to-day code?",
+          "estSeconds": 30
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "const",
+            "let",
+            "var"
+          ],
+          "prompt": "Which statements about `const` are true? Select all that apply.",
+          "choices": [
+            "The binding cannot be reassigned",
+            "The value it points at cannot be mutated",
+            "It must be initialised when declared",
+            "It is block-scoped",
+            "It makes objects deeply immutable"
+          ],
+          "answer": [
+            0,
+            2,
+            3
+          ],
+          "explanation": "`const` freezes the *binding*, not the value. `const user = { name: 'Al' }; user.name = 'Bea';` is perfectly legal — you just can't do `user = {}`. For actual immutability you need `Object.freeze` (shallow) or a library. It's block-scoped like `let`, and unlike `let` it must be initialised on the spot.",
+          "followUp": "So what does `Object.freeze` actually guarantee?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": [
+            "this",
+            "binding"
+          ],
+          "prompt": "You pass a method as a callback and lose `this`:\n\n`element.addEventListener('click', obj.handleClick)`\n\nWhich fix does **not** work?",
+          "choices": [
+            "element.addEventListener('click', () => obj.handleClick())",
+            "element.addEventListener('click', obj.handleClick.bind(obj))",
+            "element.addEventListener('click', obj.handleClick())",
+            "Define handleClick as an arrow-function class field"
+          ],
+          "answer": 2,
+          "explanation": "`obj.handleClick()` *calls* the method immediately and registers its return value (usually `undefined`) as the listener. The other three all work: wrapping in an arrow keeps the `obj.` call site, `.bind(obj)` returns a new permanently-bound function, and a class field arrow captures `this` at construction. The class-field version is what React class components used before hooks.",
+          "followUp": "What's the downside of `.bind()` inside a React render method?",
+          "estSeconds": 60
+        }
+      ]
+    },
+    {
+      "slug": "arrays-and-objects",
+      "name": "Arrays & Objects In Practice",
+      "level": "foundation",
+      "summary": "The dozen methods that make up most real code, destructuring, spread, and copy semantics.",
+      "interviewAngle": "This is the day-job track. Expect a live 'reshape this API response' exercise — they're watching whether you reach for the right method without thinking.",
+      "keyPoints": [
+        "map/filter/reduce return new arrays; push/splice/sort/reverse mutate",
+        "Spread and Object.assign are shallow — nested objects stay shared",
+        "structuredClone gives a real deep copy in modern runtimes",
+        "Optional chaining plus nullish coalescing replaces most defensive `&&` chains",
+        "Object key order is insertion order, except integer-like keys which sort numerically"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": [
+            "map",
+            "foreach"
+          ],
+          "prompt": "What's the difference between `map` and `forEach`?",
+          "choices": [
+            "`map` is faster; they're otherwise identical",
+            "`map` returns a new array of the callback's return values; `forEach` returns undefined",
+            "`forEach` mutates the original array; `map` doesn't",
+            "`map` skips empty slots; `forEach` doesn't"
+          ],
+          "answer": 1,
+          "explanation": "`map` transforms — it builds a new array from whatever the callback returns. `forEach` is for side effects and always returns `undefined`, so you can't chain it. The tell-tale code smell is a `map` whose callback returns nothing: that should have been `forEach`.",
+          "followUp": "Which would you use to render a list in React, and why?",
+          "estSeconds": 30
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "mutation",
+            "arrays"
+          ],
+          "prompt": "Which of these **mutate** the array they're called on? Select all that apply.",
+          "choices": [
+            "sort",
+            "slice",
+            "splice",
+            "map",
+            "reverse",
+            "concat"
+          ],
+          "answer": [
+            0,
+            2,
+            4
+          ],
+          "explanation": "`sort`, `splice` and `reverse` mutate in place. `slice`, `map` and `concat` return new arrays. The mutating three are a classic React bug source — mutating state means the reference never changes, so nothing re-renders. ES2023 added non-mutating twins: `toSorted`, `toSpliced`, `toReversed`, and `with`.",
+          "followUp": "You need to sort an array held in React state. Write the line.",
+          "estSeconds": 60
+        },
+        {
+          "type": "code",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "reduce",
+            "grouping"
+          ],
+          "prompt": "Write `groupBy(items, key)`. Given an array of objects and a property name, return an object mapping each distinct value of that property to the array of items that have it.\n\n`groupBy([{r:'admin',n:'Al'},{r:'user',n:'Bea'}], 'r')` → `{ admin: [{r:'admin',n:'Al'}], user: [{r:'user',n:'Bea'}] }`",
+          "starterCode": "function groupBy(items, key) {\n  // your code here\n}",
+          "solutionCode": "function groupBy(items, key) {\n  return items.reduce((acc, item) => {\n    const group = item[key];\n    (acc[group] ||= []).push(item);\n    return acc;\n  }, {});\n}",
+          "language": "js",
+          "testCases": [
+            {
+              "input": [
+                [
+                  {
+                    "r": "a",
+                    "n": 1
+                  },
+                  {
+                    "r": "b",
+                    "n": 2
+                  },
+                  {
+                    "r": "a",
+                    "n": 3
+                  }
+                ],
+                "r"
+              ],
+              "expected": {
+                "a": [
+                  {
+                    "r": "a",
+                    "n": 1
+                  },
+                  {
+                    "r": "a",
+                    "n": 3
+                  }
+                ],
+                "b": [
+                  {
+                    "r": "b",
+                    "n": 2
+                  }
+                ]
+              },
+              "description": "groups by a shared key",
+              "isEdgeCase": false
+            },
+            {
+              "input": [
+                [],
+                "r"
+              ],
+              "expected": {},
+              "description": "empty input gives an empty object",
+              "isEdgeCase": true
+            },
+            {
+              "input": [
+                [
+                  {
+                    "r": "solo",
+                    "n": 1
+                  }
+                ],
+                "r"
+              ],
+              "expected": {
+                "solo": [
+                  {
+                    "r": "solo",
+                    "n": 1
+                  }
+                ]
+              },
+              "description": "single item",
+              "isEdgeCase": true
+            }
+          ],
+          "explanation": "This is the most common real-world `reduce`, and it comes up in interviews constantly because it tests accumulator handling, dynamic keys and the empty-array edge case in one go. Modern runtimes have `Object.groupBy(items, item => item[key])` built in — worth mentioning, but they'll still want to see you write it.",
+          "followUp": "What's the accumulator's initial value, and what breaks if you leave it out?",
+          "estSeconds": 240
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "destructuring"
+          ],
+          "prompt": "Pull `id` out unchanged, rename `user_name` to `userName`, and default `role` to `'viewer'` — all in one destructuring statement.",
+          "code": "const { id, user_name: ___, role = ___ } = response;",
+          "language": "js",
+          "answer": [
+            "userName",
+            "'viewer'"
+          ],
+          "explanation": "The `:` renames, the `=` supplies a default that fires only when the property is `undefined` (not when it's `null`). Destructuring API responses into the shape your code wants — at the boundary, once — keeps snake_case out of the rest of your codebase.",
+          "followUp": "What happens to that default if the server sends `role: null`?",
+          "estSeconds": 45
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "spread",
+            "shallow-copy"
+          ],
+          "prompt": "What does this log?",
+          "code": "const original = { name: 'Al', address: { city: 'Leeds' } };\nconst copy = { ...original };\ncopy.name = 'Bea';\ncopy.address.city = 'Hull';\n\nconsole.log(original.name, original.address.city);",
+          "language": "js",
+          "answer": "Al Hull",
+          "explanation": "Spread is a *shallow* copy: top-level properties are copied, but `address` is still the same object reference in both. Reassigning `copy.name` is safe; mutating `copy.address` reaches through to the original. For a real deep copy use `structuredClone(original)`, or copy each level explicitly. This is the number one cause of 'my Redux/React state changed and I don't know why'.",
+          "followUp": "What can't `structuredClone` handle?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "objects",
+            "key-order"
+          ],
+          "prompt": "What does this log?",
+          "code": "const obj = { b: 1, 2: 2, a: 3, 1: 4 };\nconsole.log(Object.keys(obj));",
+          "language": "js",
+          "answer": "[\"1\", \"2\", \"b\", \"a\"]",
+          "explanation": "Object keys iterate in a defined order: integer-like keys first in ascending numeric order, then string keys in insertion order, then symbols. This bites when you use numeric ids as object keys and expect insertion order — use a `Map` if order matters, since `Map` preserves insertion order for every key type and allows non-string keys.",
+          "followUp": "When would you reach for a `Map` over a plain object?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "reduce"
+          ],
+          "prompt": "When should you use `reduce`, and when is it the wrong tool?",
+          "keywords": [
+            "single value|one value|accumulate|accumulator",
+            "initial value|seed",
+            "sum|total|group|flatten|index",
+            "readability|readable|harder to read",
+            "map|filter"
+          ],
+          "modelAnswer": "`reduce` is for collapsing a list into a single value using an accumulator: a sum, a lookup object keyed by id, a grouped structure, a max. Always pass the initial value — without it the first element becomes the seed, which breaks on an empty array and makes the types inconsistent.\n\nIt's the wrong tool when `map` or `filter` says the same thing more clearly. A `reduce` that pushes into an array and returns it is just a `filter` or `map` written obscurely. And chaining two passes of `map().filter()` is usually more readable than one clever `reduce`, at a performance difference that doesn't matter outside a hot loop.\n\nMy rule: if I have to read the callback twice to see what comes out, I rewrite it.",
+          "explanation": "They're testing judgement, not syntax. The strongest signal is naming a case where you'd deliberately *not* use it.",
+          "followUp": "Rewrite `arr.reduce((a, x) => x > 2 ? [...a, x] : a, [])` more clearly — and say why the original is also slow.",
+          "estSeconds": 120
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "find",
+            "filter"
+          ],
+          "prompt": "You need the first user whose email matches. Which is correct and most appropriate?",
+          "choices": [
+            "users.filter(u => u.email === target)[0]",
+            "users.find(u => u.email === target)",
+            "users.includes(u => u.email === target)",
+            "users.some(u => u.email === target)"
+          ],
+          "answer": 1,
+          "explanation": "`find` returns the first matching element (or `undefined`) and short-circuits as soon as it hits one. `filter()[0]` walks the whole array building a throwaway array. `includes` takes a value, not a predicate. `some` returns a boolean — use it when you only need to know *whether* one exists. Related: `findIndex`, `findLast`, and `at(-1)` for the last element.",
+          "followUp": "What does `find` return when nothing matches, and how does that interact with TypeScript?",
+          "estSeconds": 30
+        }
+      ]
+    },
+    {
+      "slug": "async-javascript",
+      "name": "Async, Promises & the Event Loop",
+      "level": "working",
+      "summary": "Why the order of logs surprises you, what async/await really desugars to, and how to run work in parallel.",
+      "interviewAngle": "The event-loop ordering question is near-universal, and the 'await inside a loop' performance question separates juniors from mid-level candidates.",
+      "keyPoints": [
+        "The call stack runs to completion, then all microtasks (promises), then one macrotask (timers)",
+        "An async function always returns a promise, even if you return a plain value",
+        "await inside a for-loop is sequential; Promise.all is parallel",
+        "Promise.all rejects on the first failure; allSettled always resolves with the outcomes",
+        "try/catch around await works; try/catch around a non-awaited promise does not"
+      ],
+      "items": [
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "event-loop",
+            "microtasks"
+          ],
+          "prompt": "What does this log, in order?",
+          "code": "console.log('1');\nsetTimeout(() => console.log('2'), 0);\nPromise.resolve().then(() => console.log('3'));\nconsole.log('4');",
+          "language": "js",
+          "answer": "1\n4\n3\n2",
+          "explanation": "Synchronous code runs first: 1, then 4. When the stack empties, the engine drains the *microtask* queue — promise callbacks — giving 3. Only then does it take one *macrotask* from the timer queue: 2. `setTimeout(fn, 0)` never means 'now'; it means 'after the current work and all pending promises'.",
+          "followUp": "What if the `.then` callback itself schedules another promise? When does it run?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": [
+            "async",
+            "promises"
+          ],
+          "prompt": "What is the type of `result`?",
+          "code": "async function getCount() {\n  return 42;\n}\n\nconst result = getCount();",
+          "language": "js",
+          "choices": [
+            "number — 42",
+            "Promise<number> — a promise that resolves to 42",
+            "undefined until it resolves",
+            "It throws, because you must await an async function"
+          ],
+          "answer": 1,
+          "explanation": "`async` always wraps the return value in a promise. Returning `42` gives `Promise.resolve(42)`. Forgetting this is why `const x = getCount(); x + 1` yields `\"[object Promise]1\"` instead of 43. Anything with `async` in its signature has to be awaited or `.then`ed at some point up the chain.",
+          "followUp": "What happens if an async function throws instead of returning?",
+          "estSeconds": 30
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "performance",
+            "promise-all"
+          ],
+          "prompt": "Fetching 10 users takes ~100ms each. Roughly how long does this take, and what's the fix?",
+          "code": "const users = [];\nfor (const id of ids) {\n  users.push(await fetchUser(id));\n}",
+          "language": "js",
+          "choices": [
+            "~100ms — awaits inside a loop run in parallel",
+            "~1000ms — use `await Promise.all(ids.map(fetchUser))`",
+            "~1000ms — this is optimal, requests must be sequential",
+            "~100ms — but it should still be rewritten for clarity"
+          ],
+          "answer": 1,
+          "explanation": "Each `await` pauses the loop until that request finishes, so ten 100ms calls take about a second. `Promise.all(ids.map(id => fetchUser(id)))` fires all ten immediately and waits for the slowest — about 100ms. Sequential is only right when each call depends on the previous one's result, or when you're deliberately rate-limiting.",
+          "followUp": "One of the ten fails. What does `Promise.all` do, and what would you use instead?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "promise-combinators"
+          ],
+          "prompt": "Compare `Promise.all`, `Promise.allSettled`, `Promise.race` and `Promise.any`. When would you reach for each?",
+          "keywords": [
+            "all|promise.all",
+            "reject|rejects|fails fast|first rejection",
+            "allsettled|settled",
+            "race",
+            "any|first fulfilled|first success",
+            "timeout"
+          ],
+          "modelAnswer": "`Promise.all` resolves with an array of all results, but rejects as soon as *any* input rejects — the others keep running, you just don't get their values. Use it when you need everything and a partial result is useless: loading a page's required data.\n\n`Promise.allSettled` never rejects. It resolves with `{status, value}` or `{status, reason}` for each. Use it for independent work where you want to report what failed: sending 50 emails, or a dashboard of widgets that can each fail on their own.\n\n`Promise.race` settles with whichever finishes first, resolved *or* rejected. The classic use is a timeout: race the real request against a promise that rejects after 5 seconds. (`AbortController` is the better modern answer for fetch.)\n\n`Promise.any` resolves with the first *fulfilled* one, ignoring rejections until they all fail. Use it for redundant sources — three mirrors, take whichever answers first.",
+          "explanation": "The distinction that matters is all-vs-allSettled (fail fast vs collect outcomes) and race-vs-any (first settled vs first success). Naming the timeout pattern for `race` shows you've used it.",
+          "followUp": "Show the timeout pattern — and then show why `AbortController` is better.",
+          "estSeconds": 150
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": [
+            "error-handling",
+            "async"
+          ],
+          "prompt": "What does this log?",
+          "code": "function boom() {\n  return Promise.reject(new Error('nope'));\n}\n\nasync function run() {\n  try {\n    boom();\n  } catch (err) {\n    console.log('caught:', err.message);\n  }\n  console.log('done');\n}\n\nrun();",
+          "language": "js",
+          "answer": "done",
+          "explanation": "The `try/catch` only catches synchronous throws. `boom()` returns a rejected promise and returns *normally* — nothing throws inside the try block, so the catch never runs and you get an unhandled rejection instead. Adding `await` in front of `boom()` makes the rejection surface as a throw, and then it's caught. Missing `await` before a call inside try/catch is one of the most common real bugs in Node services.",
+          "followUp": "How would you catch this without adding `await`?",
+          "estSeconds": 90
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "promise-all",
+            "parallel"
+          ],
+          "prompt": "Fetch the user and their orders in parallel, then destructure both results.",
+          "code": "const [user, orders] = ___ Promise.___([\n  fetchUser(id),\n  fetchOrders(id),\n]);",
+          "language": "js",
+          "answer": [
+            "await",
+            "all"
+          ],
+          "explanation": "Calling both functions inside the array literal starts both requests immediately; `Promise.all` then waits for both and preserves input order in the results array — which is what makes the destructuring safe. The order is by position, not by which finished first.",
+          "followUp": "The two calls now return different types. How does TypeScript type this destructuring?",
+          "estSeconds": 45
+        },
+        {
+          "type": "order",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": [
+            "event-loop"
+          ],
+          "prompt": "Put these in the order the runtime processes them after the current synchronous code finishes.",
+          "choices": [
+            "Finish running all remaining synchronous code on the call stack",
+            "Drain the entire microtask queue (promise callbacks, queueMicrotask)",
+            "Run one macrotask (a timer or I/O callback)",
+            "Drain the microtask queue again before the next macrotask"
+          ],
+          "answer": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "explanation": "The stack always runs to completion — JavaScript never interrupts a running function. Then *all* microtasks drain, including any that microtasks themselves queue (which is why an infinite promise chain can starve timers). Then exactly one macrotask runs, and the microtask queue drains again before the next. In browsers, rendering gets a chance between macrotasks.",
+          "followUp": "What does it mean to 'starve' the event loop, and how would you notice in production?",
+          "estSeconds": 90
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "promises"
+          ],
+          "prompt": "Which statements about promises are true? Select all that apply.",
+          "choices": [
+            "A promise can settle more than once",
+            "`.then` always returns a new promise",
+            "Throwing inside `.then` produces a rejected promise",
+            "`await` can only be used inside an async function or a module top level",
+            "A `.catch` handles rejections from every `.then` before it in the chain"
+          ],
+          "answer": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "explanation": "A promise settles exactly once — after that it's frozen. Everything else holds: `.then` returns a new promise (that's what makes chaining work), a throw inside a handler becomes a rejection, `await` needs an async context or ESM top level, and a trailing `.catch` catches rejections from anywhere earlier in the chain — but not from `.then`s added *after* it.",
+          "followUp": "Where should the `.catch` go if you want a fallback value rather than a failure?",
+          "estSeconds": 75
+        }
+      ]
+    },
+    {
+      "slug": "modules-and-objects",
+      "name": "Modules, Classes & Prototypes",
+      "level": "working",
+      "summary": "ESM vs CommonJS, what `class` compiles down to, and the prototype chain underneath it all.",
+      "interviewAngle": "Any Node role will ask about `import` vs `require`. Any role at all may ask what the prototype chain is — they want to know you understand JS inheritance isn't classical.",
+      "keyPoints": [
+        "ESM is static and hoisted; CommonJS `require` is dynamic and runs at call time",
+        "`class` is syntax over prototypes — methods live on `Constructor.prototype`",
+        "Property lookup walks the prototype chain until it hits null",
+        "`#private` fields are truly private; `_underscore` is only a convention",
+        "A default export has no name at the import site, which hurts refactors and search"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "esm",
+            "commonjs",
+            "node"
+          ],
+          "prompt": "Which statement about ES modules vs CommonJS is correct?",
+          "choices": [
+            "`require` is hoisted and resolved at parse time; `import` runs where it appears",
+            "`import` is static and hoisted; `require` is dynamic and executes at that line",
+            "They're interchangeable — Node treats them identically",
+            "ESM only works in browsers, CommonJS only in Node"
+          ],
+          "answer": 1,
+          "explanation": "`import` statements are hoisted and resolved before any module code runs, which is what makes tree-shaking and circular-dependency analysis possible. `require()` is an ordinary function call — you can put it in an `if`, compute the path, and it executes at that point. Node picks the mode from `\"type\": \"module\"` in package.json or the `.mjs`/`.cjs` extension. ESM can `import` CJS, but CJS can only reach ESM via dynamic `import()`.",
+          "followUp": "You need to conditionally load a heavy module only in development. How, in ESM?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "prototypes",
+            "inheritance"
+          ],
+          "prompt": "Explain the prototype chain. What actually happens when you call `myArray.map(...)`?",
+          "keywords": [
+            "prototype|__proto__|[[prototype]]",
+            "lookup|walks|chain|up the chain",
+            "not found|own property",
+            "null|end of the chain",
+            "array.prototype|object.prototype",
+            "class|syntactic sugar|sugar"
+          ],
+          "modelAnswer": "Every object has an internal link to another object — its prototype. When you read a property, the engine checks the object's own properties first; if it's not there, it follows the link to the prototype and checks there, and keeps going until it finds it or reaches `null`.\n\nSo `myArray.map` isn't on the array. The engine looks at the array's own keys (the indices and `length`), doesn't find `map`, follows the link to `Array.prototype`, and finds it there. If it hadn't, the next stop would be `Object.prototype`, and then `null`.\n\n`class` is syntax over this: methods you write in a class body are installed on `Constructor.prototype`, and `extends` sets one prototype object's link to the other. That's why every instance shares one copy of each method rather than getting its own — and why adding to `Array.prototype` at runtime affects arrays that already exist.",
+          "explanation": "The signal they want is 'lookup walks a chain of objects until null' plus the recognition that `class` is sugar over it. Mentioning shared method copies is a good extra.",
+          "followUp": "Why is modifying `Array.prototype` in a library considered harmful?",
+          "estSeconds": 150
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "classes",
+            "this"
+          ],
+          "prompt": "What does this log?",
+          "code": "class Timer {\n  seconds = 0;\n  tick() {\n    this.seconds++;\n    return this.seconds;\n  }\n}\n\nconst timer = new Timer();\nconst tick = timer.tick;\n\ntry {\n  console.log(tick());\n} catch (err) {\n  console.log(err.constructor.name);\n}",
+          "language": "js",
+          "answer": "TypeError",
+          "explanation": "Detaching a method loses its receiver. Class bodies are always strict mode, so `this` is `undefined` rather than the global object, and `this.seconds` throws a TypeError. Fixes: `timer.tick.bind(timer)`, wrap in an arrow, or declare it as a class field — `tick = () => { ... }` — which binds at construction time.",
+          "followUp": "What's the memory tradeoff of the arrow-function class field?",
+          "estSeconds": 60
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "esm",
+            "exports"
+          ],
+          "prompt": "Which are true about ES module exports? Select all that apply.",
+          "choices": [
+            "A module can have at most one default export",
+            "Named exports must be imported with the exact exported name (unless aliased)",
+            "`export default` and named exports can coexist in one file",
+            "Imports are copies of the exported values at import time",
+            "A module's top-level code runs once, no matter how many files import it"
+          ],
+          "answer": [
+            0,
+            1,
+            2,
+            4
+          ],
+          "explanation": "Imports are *live bindings*, not copies — if the exporting module reassigns the variable later, importers see the new value. Everything else holds. Modules are singletons: the body evaluates once and the result is cached, which is why a module-level `const db = connect()` gives you one shared connection.",
+          "followUp": "How does that module caching interact with hot reload in a Next.js dev server?",
+          "estSeconds": 75
+        },
+        {
+          "type": "fill",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": [
+            "optional-chaining"
+          ],
+          "prompt": "Read `user.profile.address.city` safely — the whole chain may be missing — and fall back to `'Unknown'`.",
+          "code": "const city = user___profile___address___city ___ 'Unknown';",
+          "language": "js",
+          "answer": [
+            "?.",
+            "?.",
+            "?.",
+            "??"
+          ],
+          "explanation": "`?.` short-circuits the entire chain to `undefined` the moment any link is `null` or `undefined`, so you don't need nested `&&` guards. Pair it with `??` rather than `||` so a legitimately empty-string city isn't replaced. It also works for calls (`fn?.()`) and index access (`arr?.[0]`).",
+          "followUp": "Where does `?.` bite you — when is silently getting `undefined` the wrong behaviour?",
+          "estSeconds": 45
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "classes",
+            "private"
+          ],
+          "prompt": "What's the practical difference between `#count` and `_count` in a class?",
+          "choices": [
+            "None — both are conventions",
+            "`#count` is enforced by the runtime and inaccessible outside the class; `_count` is a naming convention only",
+            "`_count` is enforced; `#count` is TypeScript-only syntax",
+            "`#count` is only private in TypeScript, not at runtime"
+          ],
+          "answer": 1,
+          "explanation": "`#count` is a real private field — accessing it from outside is a *syntax* error, and it doesn't appear in `Object.keys`, `JSON.stringify`, or the debugger's own-property list. `_count` is just a name; anyone can read and write it. TypeScript's `private` keyword is also compile-time only and disappears at runtime — `#` is the one with teeth.",
+          "followUp": "Why might you still prefer TypeScript's `private` over `#` in some codebases?",
+          "estSeconds": 45
+        },
+        {
+          "type": "code",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "higher-order-functions"
+          ],
+          "prompt": "Write `once(fn)`. It returns a wrapper that calls `fn` the first time only; every call after that returns the first result without invoking `fn` again.",
+          "starterCode": "function once(fn) {\n  // your code here\n}",
+          "solutionCode": "function once(fn) {\n  let called = false;\n  let result;\n  return function (...args) {\n    if (!called) {\n      called = true;\n      result = fn.apply(this, args);\n    }\n    return result;\n  };\n}",
+          "language": "js",
+          "testCases": [
+            {
+              "call": "let calls = 0; const f = fn(() => ++calls); f(); f(); f(); return calls;",
+              "expected": 1,
+              "description": "the wrapped function runs only once",
+              "isEdgeCase": false
+            },
+            {
+              "call": "const f = fn((a, b) => a + b); f(1, 2); return f(9, 9);",
+              "expected": 3,
+              "description": "later calls return the first result",
+              "isEdgeCase": false
+            },
+            {
+              "call": "const f = fn((x) => x * 2); return f(21);",
+              "expected": 42,
+              "description": "arguments are forwarded on the first call",
+              "isEdgeCase": false
+            },
+            {
+              "call": "let calls = 0; const f = fn(() => { calls++; }); f(); f(); return calls;",
+              "expected": 1,
+              "description": "a function returning undefined still only runs once",
+              "isEdgeCase": true
+            }
+          ],
+          "explanation": "The `called` flag and the cached `result` live in the closure. Two details separate a good answer: use a boolean flag rather than checking `result === undefined` — the last test fails otherwise, because a function that legitimately returns `undefined` would be called forever — and forward `this` with `apply` so it still works as a method.\n\nThis is the pattern behind one-time initialisation: a lazily-created DB connection, a single analytics init call.",
+          "followUp": "How would you extend this into a `memoize` that caches per-argument?",
+          "estSeconds": 180
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 1,
+          "tags": [
+            "objects",
+            "freeze"
+          ],
+          "prompt": "What does this log?",
+          "code": "const config = Object.freeze({\n  name: 'api',\n  limits: { rps: 10 },\n});\n\nconfig.name = 'changed';\nconfig.limits.rps = 999;\n\nconsole.log(config.name, config.limits.rps);",
+          "language": "js",
+          "answer": "api 999",
+          "explanation": "`Object.freeze` is shallow. The top-level `name` assignment is silently ignored (it throws in strict mode), but `limits` is a separate object that was never frozen, so its contents are still writable. A real deep freeze needs recursion. This mirrors the shallow-copy problem — in JavaScript, almost every built-in that says 'object' means 'one level'.",
+          "followUp": "Write a `deepFreeze`. What does it need to guard against?",
+          "estSeconds": 60
+        }
+      ]
+    },
+    {
+      "slug": "errors-and-robustness",
+      "name": "Errors & Defensive Code",
+      "level": "working",
+      "summary": "try/catch/finally semantics, custom error types, and what to do when the input is garbage.",
+      "interviewAngle": "'How do you handle errors in your API?' is asked in every backend interview. They want layered handling and a story about what the client sees.",
+      "keyPoints": [
+        "`finally` runs on every path — and a return in finally overrides the one in try",
+        "Subclass `Error` so callers can branch on the type, not on a message string",
+        "Catch where you can actually do something; otherwise let it bubble to one handler",
+        "Never swallow an error with an empty catch block",
+        "Validate at the boundary so the rest of the code can trust its inputs"
+      ],
+      "items": [
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": [
+            "try-catch",
+            "finally"
+          ],
+          "prompt": "What does this log?",
+          "code": "function decide() {\n  try {\n    return 'try';\n  } finally {\n    return 'finally';\n  }\n}\n\nconsole.log(decide());",
+          "language": "js",
+          "answer": "finally",
+          "explanation": "`finally` runs before the function actually returns, and a `return` inside it replaces the pending one — it will even swallow a pending exception. That's why returning from `finally` is almost always a bug, and most linters flag it. Use `finally` for cleanup (closing handles, clearing a loading flag), never for control flow.",
+          "followUp": "What's the right thing to put in a `finally` block?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": [
+            "custom-errors"
+          ],
+          "prompt": "Why subclass `Error` instead of throwing a string or a plain object?",
+          "choices": [
+            "Strings are slower to throw",
+            "Only Error instances can be caught by `catch`",
+            "You get a stack trace, `instanceof` checks work, and callers can branch on the type",
+            "It's required by strict mode"
+          ],
+          "answer": 2,
+          "explanation": "You can throw anything, and `catch` catches all of it — which is exactly the problem. A thrown string has no stack trace, so you lose where it came from. A proper `class NotFoundError extends Error` lets a caller write `if (err instanceof NotFoundError) return res.status(404)` instead of matching on `err.message.includes('not found')`, which breaks the moment someone fixes a typo in the message.",
+          "followUp": "Sketch the error classes you'd define for a CRUD API.",
+          "estSeconds": 45
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": [
+            "error-handling",
+            "api"
+          ],
+          "prompt": "How do you handle errors in a REST API? Walk me from a database failure to what the client sees.",
+          "keywords": [
+            "throw|typed error|custom error",
+            "middleware|handler|global|central",
+            "status|status code|4xx|5xx",
+            "log|logging|correlation|trace",
+            "leak|stack trace|internal|expose",
+            "validation|validate"
+          ],
+          "modelAnswer": "The layer that hits the problem throws a typed error — `NotFoundError`, `ValidationError`, `ConflictError` — and doesn't try to turn it into an HTTP response, because it doesn't know it's in an HTTP context.\n\nA single error-handling middleware at the edge maps those types to status codes: 400 for validation, 401/403 for auth, 404 for not found, 409 for conflicts, 500 for anything unrecognised. It returns a consistent body — a stable machine-readable `code`, a human `message`, and field-level details for validation errors.\n\nAnything unrecognised gets logged at error level with the stack and a correlation id, and the client gets a generic 500 plus that id. Never send a stack trace or a raw database message to the client: it leaks schema and library versions.\n\nAhead of all of that, validation at the boundary means most bad input never reaches the service layer at all. And I make sure the process doesn't die silently — unhandled rejections and uncaught exceptions get logged and, in Node, usually restart the process.",
+          "explanation": "The structure they're listening for is: throw typed errors deep, translate once at the edge, log with context, never leak internals. Mentioning correlation ids and unhandled rejections marks a candidate who has run something in production.",
+          "followUp": "What status code do you return when a POST would create a duplicate, and why not 400?",
+          "estSeconds": 180
+        },
+        {
+          "type": "code",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "json",
+            "defensive"
+          ],
+          "prompt": "Write `safeParse(text, fallback)`. Return the parsed JSON, or `fallback` if the text is invalid — never throw.",
+          "starterCode": "function safeParse(text, fallback) {\n  // your code here\n}",
+          "solutionCode": "function safeParse(text, fallback) {\n  try {\n    return JSON.parse(text);\n  } catch {\n    return fallback;\n  }\n}",
+          "language": "js",
+          "testCases": [
+            {
+              "input": [
+                "{\"a\":1}",
+                null
+              ],
+              "expected": {
+                "a": 1
+              },
+              "description": "parses valid JSON",
+              "isEdgeCase": false
+            },
+            {
+              "input": [
+                "not json",
+                "fallback"
+              ],
+              "expected": "fallback",
+              "description": "returns the fallback on invalid input",
+              "isEdgeCase": false
+            },
+            {
+              "input": [
+                "",
+                0
+              ],
+              "expected": 0,
+              "description": "empty string is invalid JSON",
+              "isEdgeCase": true
+            },
+            {
+              "input": [
+                "null",
+                "fb"
+              ],
+              "expected": null,
+              "description": "the literal 'null' parses to null, not the fallback",
+              "isEdgeCase": true
+            }
+          ],
+          "explanation": "The interesting case is the last one: `JSON.parse('null')` succeeds and returns `null`, so a `result || fallback` implementation would be wrong. Reading from `localStorage` is where you actually need this — the stored value can be `null`, stale, or written by an older version of your code.\n\nNote the optional catch binding (`catch {`), which is valid modern JS when you don't need the error.",
+          "followUp": "Why is `JSON.parse` a security consideration when the input comes from a user?",
+          "estSeconds": 120
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "error-handling"
+          ],
+          "prompt": "Which of these are error-handling mistakes? Select all that apply.",
+          "choices": [
+            "`catch (e) {}` with an empty body",
+            "Catching, logging, and rethrowing at a boundary you own",
+            "Returning `null` from a function that failed, with no other signal",
+            "Wrapping your whole `main()` in one try/catch and nothing else",
+            "Matching on `err.message` to decide the HTTP status"
+          ],
+          "answer": [
+            0,
+            2,
+            3,
+            4
+          ],
+          "explanation": "An empty catch destroys the evidence — the bug still happens, you just can't find it. Silent `null` returns push the problem to a caller who won't check. One giant try/catch tells you something broke but not what to do about it. And matching on message strings is fragile: rename the message, break the routing. Catch-log-rethrow at a boundary is legitimate — it adds context without swallowing.",
+          "followUp": "When *is* returning null instead of throwing the right call?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "async",
+            "error-handling"
+          ],
+          "prompt": "In Node, what happens when a promise rejects and nothing ever handles it?",
+          "choices": [
+            "It's silently ignored",
+            "It logs a warning and continues, forever",
+            "By default the process crashes with an unhandled rejection error",
+            "The next `try/catch` in the file catches it"
+          ],
+          "answer": 2,
+          "explanation": "Since Node 15 the default `--unhandled-rejections` mode is `throw`, which terminates the process. That's deliberate: a rejection nobody handled means your program is in a state you didn't plan for. In practice you add a `process.on('unhandledRejection')` handler that logs with full context and then exits, letting the supervisor restart cleanly.",
+          "followUp": "Why is crashing and restarting often better than logging and carrying on?",
+          "estSeconds": 45
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": [
+            "custom-errors"
+          ],
+          "prompt": "Complete a custom error class that carries an HTTP status.",
+          "code": "class NotFoundError extends ___ {\n  constructor(resource) {\n    ___(`${resource} not found`);\n    this.name = 'NotFoundError';\n    this.status = 404;\n  }\n}",
+          "language": "js",
+          "answer": [
+            "Error",
+            "super"
+          ],
+          "explanation": "`super(message)` is what wires up `message` and the stack trace — skip it and you get a `ReferenceError` for touching `this` before `super`, and even if you didn't, the error would have no message. Setting `name` explicitly matters because minifiers rename classes, and `err.name` is what shows up in logs.",
+          "followUp": "How would your error middleware use `status` here, and what's the default when it's missing?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 1,
+          "tags": [
+            "try-catch",
+            "async"
+          ],
+          "prompt": "What does this log?",
+          "code": "async function work() {\n  throw new Error('failed');\n}\n\nwork()\n  .then(() => console.log('then'))\n  .catch((e) => console.log('catch:', e.message))\n  .finally(() => console.log('finally'));",
+          "language": "js",
+          "answer": "catch: failed\nfinally",
+          "explanation": "A throw inside an async function rejects its promise, so the `.then` is skipped entirely and the `.catch` runs. `.finally` then runs regardless of outcome and — unlike a `finally` block — passes the value or rejection straight through, so it's safe for cleanup in a chain.",
+          "followUp": "If the `.catch` were placed before the `.then`, what would happen?",
+          "estSeconds": 60
+        }
+      ]
+    }
+  ]
+}

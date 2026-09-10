@@ -1,151 +1,162 @@
 import { NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
+import { sqlite, DEFAULT_USER_ID } from "@/lib/db";
+import { getDrillItem } from "@/lib/content";
+import { grade, ratingFor } from "@/lib/grading";
+import { cardFromRow, cardToRow, newCard, review, type CardRow } from "@/lib/fsrs";
 import { generateId, now } from "@/lib/utils";
-import { createNewCard, scheduleNext, cardFromDb, cardToDb } from "@/lib/fsrs";
+import type { Rating, Response as DrillResponse, Verdict } from "@/types";
 
-const DEFAULT_USER_ID = "default-user";
+type Body = {
+  itemId: string;
+  response: DrillResponse;
+  timeSpent?: number;
+  usedHint?: boolean;
+  interviewId?: string;
+  /** Only trusted for types the server can't grade itself. */
+  verdict?: Verdict;
+  score?: number;
+};
 
+/**
+ * Records one answered item and advances its review schedule.
+ *
+ * The grade is recomputed here rather than trusted from the client, so the
+ * progress numbers reflect the same rules everywhere. The two exceptions are
+ * `code` (graded by the browser sandbox) and `explain` (the learner rates
+ * themselves) — for those the client's verdict is the only one available.
+ */
 export async function POST(request: Request) {
+  let body: Body;
   try {
-    const body = await request.json();
-    const {
-      problemId,
-      code,
-      approachText,
-      passed,
-      timeSpent,
-      timedMode,
-      errorType,
-    } = body;
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
+  }
 
-    if (!problemId || code === undefined) {
-      return NextResponse.json(
-        { success: false, error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    const timestamp = now();
-
-    // 1. Record the attempt
-    const attempt = {
-      id: generateId(),
-      userId: DEFAULT_USER_ID,
-      problemId,
-      code,
-      approachText: approachText || "",
-      passed: !!passed,
-      timeSpent: timeSpent || 0,
-      timedMode: !!timedMode,
-      errorType: errorType || null,
-      createdAt: timestamp,
-    };
-
-    db.insert(schema.attempts).values(attempt).run();
-
-    // 2. Get or create the FSRS card for this user×problem
-    let existingCard = db
-      .select()
-      .from(schema.userCards)
-      .where(
-        and(
-          eq(schema.userCards.userId, DEFAULT_USER_ID),
-          eq(schema.userCards.problemId, problemId)
-        )
-      )
-      .get();
-
-    // Get problem for time limit
-    const problem = db
-      .select()
-      .from(schema.problems)
-      .where(eq(schema.problems.id, problemId))
-      .get();
-
-    const timeLimit = problem?.timeLimit || 300;
-
-    if (!existingCard) {
-      // Create new card
-      const newCard = createNewCard();
-      const cardData = cardToDb(newCard);
-      existingCard = {
-        id: generateId(),
-        userId: DEFAULT_USER_ID,
-        problemId,
-        ...cardData,
-      };
-      db.insert(schema.userCards).values(existingCard).run();
-    }
-
-    // 3. Schedule next review via FSRS
-    const card = cardFromDb(existingCard);
-    const { card: updatedCard, rating } = scheduleNext(
-      card,
-      !!passed,
-      timeSpent || 0,
-      timeLimit,
-      !!timedMode
+  if (!body.itemId || !body.response) {
+    return NextResponse.json(
+      { success: false, error: "itemId and response are required" },
+      { status: 400 }
     );
-    const updatedCardData = cardToDb(updatedCard);
+  }
 
-    db.update(schema.userCards)
-      .set(updatedCardData)
-      .where(eq(schema.userCards.id, existingCard.id))
-      .run();
+  const item = getDrillItem(DEFAULT_USER_ID, body.itemId);
+  if (!item) {
+    return NextResponse.json({ success: false, error: "Unknown item" }, { status: 404 });
+  }
 
-    // 4. Update tier progress if passed
-    if (passed && problem) {
-      updateTierProgress(problem.categoryId);
-    }
+  const clientGraded = item.type === "code" || item.type === "explain";
+  const verdict: Verdict = clientGraded
+    ? (body.verdict ?? "incorrect")
+    : grade(item, body.response).verdict;
+  const score = clientGraded
+    ? clamp(body.score ?? 0)
+    : grade(item, body.response).score;
+
+  const timeSpent = Math.max(0, Math.round(body.timeSpent ?? 0));
+  const usedHint = Boolean(body.usedHint);
+
+  const rating: Rating =
+    body.response.kind === "selfRated"
+      ? body.response.rating
+      : ratingFor(
+          { verdict, score, detail: [], hits: [], misses: [], tests: [], message: "" },
+          timeSpent,
+          item.estSeconds,
+          usedHint
+        );
+
+  const timestamp = now();
+
+  try {
+    const persist = sqlite.transaction(() => {
+      sqlite
+        .prepare(
+          `INSERT INTO attempts
+             (id, user_id, item_id, response, verdict, score, rating, time_spent, used_hint, interview_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          generateId(),
+          DEFAULT_USER_ID,
+          item.id,
+          JSON.stringify(body.response),
+          verdict,
+          score,
+          rating,
+          timeSpent,
+          usedHint ? 1 : 0,
+          body.interviewId ?? null,
+          timestamp
+        );
+
+      const existing = sqlite
+        .prepare(
+          `SELECT id, stability, difficulty, due, reps, lapses, state, last_review AS lastReview
+           FROM user_cards WHERE user_id = ? AND item_id = ?`
+        )
+        .get(DEFAULT_USER_ID, item.id) as (CardRow & { id: string }) | undefined;
+
+      const current = existing ? cardFromRow(existing) : newCard();
+      const updated = cardToRow(review(current, rating));
+
+      if (existing) {
+        sqlite
+          .prepare(
+            `UPDATE user_cards
+             SET stability = ?, difficulty = ?, due = ?, reps = ?, lapses = ?, state = ?, last_review = ?
+             WHERE id = ?`
+          )
+          .run(
+            updated.stability,
+            updated.difficulty,
+            updated.due,
+            updated.reps,
+            updated.lapses,
+            updated.state,
+            updated.lastReview,
+            existing.id
+          );
+      } else {
+        sqlite
+          .prepare(
+            `INSERT INTO user_cards
+               (id, user_id, item_id, stability, difficulty, due, reps, lapses, state, last_review)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            generateId(),
+            DEFAULT_USER_ID,
+            item.id,
+            updated.stability,
+            updated.difficulty,
+            updated.due,
+            updated.reps,
+            updated.lapses,
+            updated.state,
+            updated.lastReview
+          );
+      }
+
+      return updated;
+    });
+
+    const card = persist();
 
     return NextResponse.json({
       success: true,
-      data: {
-        attemptId: attempt.id,
-        rating,
-        nextDue: updatedCardData.due,
-      },
+      data: { verdict, score, rating, nextDue: card.due },
     });
   } catch (error) {
-    console.error("Attempt recording error:", error);
+    console.error("Failed to record attempt:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to record attempt" },
+      { success: false, error: "Could not record the attempt" },
       { status: 500 }
     );
   }
 }
 
-function updateTierProgress(categoryId: string) {
-  const progress = db
-    .select()
-    .from(schema.userTierProgress)
-    .where(
-      and(
-        eq(schema.userTierProgress.userId, DEFAULT_USER_ID),
-        eq(schema.userTierProgress.categoryId, categoryId)
-      )
-    )
-    .get();
-
-  if (!progress) return;
-
-  const newConsecutive = progress.consecutivePass + 1;
-
-  // Promote if 4 consecutive passes at current tier
-  if (newConsecutive >= 4 && progress.currentTier < 5) {
-    db.update(schema.userTierProgress)
-      .set({
-        currentTier: progress.currentTier + 1,
-        consecutivePass: 0,
-        tierUnlockedAt: now(),
-      })
-      .where(eq(schema.userTierProgress.id, progress.id))
-      .run();
-  } else {
-    db.update(schema.userTierProgress)
-      .set({ consecutivePass: newConsecutive })
-      .where(eq(schema.userTierProgress.id, progress.id))
-      .run();
-  }
+function clamp(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
 }

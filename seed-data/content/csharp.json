@@ -1,0 +1,734 @@
+{
+  "track": {
+    "id": "trk-csharp",
+    "slug": "csharp",
+    "name": "C#",
+    "tagline": "The other half of the stack, and the language questions that come with it",
+    "description": "Value and reference types, nullable reference types, OOP as .NET actually uses it, LINQ and deferred execution, and async/await where getting it wrong deadlocks a thread pool.",
+    "icon": "C#",
+    "accent": "violet",
+    "sortOrder": 5
+  },
+  "modules": [
+    {
+      "slug": "cs-fundamentals",
+      "name": "Types, Values & Nullability",
+      "level": "foundation",
+      "summary": "Value vs reference types, the stack/heap story, strings, and nullable reference types.",
+      "interviewAngle": "'Value type vs reference type' is the opening question in most .NET interviews. Nullable reference types are the modern follow-up.",
+      "keyPoints": [
+        "structs are value types copied on assignment; classes are reference types sharing an instance",
+        "Strings are immutable reference types — every 'modification' allocates a new one",
+        "`int?` is Nullable<int>; `string?` under NRTs is a compiler annotation with no runtime effect",
+        "`==` on strings compares content; on most other reference types it compares identity",
+        "var is static typing with inference, not dynamic typing"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["value-types", "reference-types"],
+          "prompt": "What does this print?",
+          "code": "struct PointS { public int X; }\nclass PointC { public int X; }\n\nvar s1 = new PointS { X = 1 };\nvar s2 = s1;\ns2.X = 99;\n\nvar c1 = new PointC { X = 1 };\nvar c2 = c1;\nc2.X = 99;\n\nConsole.WriteLine($\"{s1.X} {c1.X}\");",
+          "language": "csharp",
+          "choices": ["1 1", "1 99", "99 99", "99 1"],
+          "answer": 1,
+          "explanation": "A struct is a value type: `s2 = s1` copies the whole value, so changing `s2` leaves `s1` alone. A class is a reference type: `c2 = c1` copies the *reference*, so both names point at one object and the change is visible through either. This is the exact same distinction as primitives vs objects in JavaScript, which makes it easy to carry across — and it's why mutable structs are considered a design mistake.",
+          "followUp": "Why are mutable structs discouraged?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["nullable-reference-types"],
+          "prompt": "What are nullable reference types and what do they actually guarantee?",
+          "keywords": [
+            "compiler|compile time|static analysis",
+            "warning|warnings|diagnostic",
+            "string?|nullable annotation|annotation",
+            "no runtime|not enforced|erased|does not prevent",
+            "null reference|nullreferenceexception"
+          ],
+          "modelAnswer": "With nullable reference types enabled — `<Nullable>enable</Nullable>` in the csproj — the compiler treats `string` as 'should not be null' and `string?` as 'may be null'. It then does flow analysis and warns when you dereference something that might be null, or assign null to something that shouldn't be.\n\nWhat it guarantees is nothing at runtime. It's annotations plus static analysis; the IL is unchanged, and `string` and `string?` are the same type as far as the CLR is concerned. You can still get a NullReferenceException — from reflection, from deserialising JSON that omitted a required field, from an older library that isn't annotated, or by using `!` to silence the warning.\n\nSo it's the same deal as TypeScript's strictNullChecks: enormously valuable for catching the common cases at compile time, worthless against data crossing a boundary. For anything coming from outside — request bodies, config, database reads through a loosely-typed layer — I'd still validate.\n\nWorth knowing that warnings aren't errors by default, so on a real project you'd set `TreatWarningsAsErrors` or at least promote the nullable ones, otherwise they accumulate and get ignored.",
+          "explanation": "The point they're checking is whether you know it's compile-time only. Drawing the parallel to TypeScript shows transferable understanding.",
+          "followUp": "What does the `!` null-forgiving operator do, and when is it justified?",
+          "estSeconds": 180
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["strings", "immutability"],
+          "prompt": "Why is building a string in a loop with `+=` a problem, and what's the fix?",
+          "code": "var result = \"\";\nforeach (var row in rows) {\n    result += row + \"\\n\";\n}",
+          "language": "csharp",
+          "choices": [
+            "It isn't a problem — the compiler optimises it",
+            "Strings are immutable, so each += allocates a new string and copies everything — O(n²) work and heavy GC pressure. Use StringBuilder",
+            "The += operator isn't valid on strings",
+            "It causes a memory leak"
+          ],
+          "answer": 1,
+          "explanation": "Every `+=` creates a brand-new string containing all the previous content plus the new part, then abandons the old one. For 10,000 rows that's 10,000 allocations of steadily growing size. `StringBuilder` keeps a mutable buffer and grows it geometrically, giving roughly linear work. For a handful of concatenations `+` is fine and clearer — the compiler folds constants and uses `String.Concat`. It's loops where it bites. `string.Join(\"\\n\", rows)` is even better here.",
+          "followUp": "Roughly where's the crossover — how many concatenations before StringBuilder wins?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["equality"],
+          "prompt": "What does this print?",
+          "code": "string a = \"hello\";\nstring b = \"hel\" + \"lo\";\nobject c = new string(\"hello\".ToCharArray());\n\nConsole.WriteLine($\"{a == b} {a == c}\");",
+          "language": "csharp",
+          "answer": "True False",
+          "explanation": "`string`'s `==` is overloaded to compare content, so `a == b` is True (the compiler also interns the constant-folded literal). But `c` is typed as `object`, so the compiler picks `object`'s reference-equality operator instead — comparing two different heap instances gives False. Operator resolution is static, based on the compile-time type. This is why `Equals` or an explicit cast is safer when the static type isn't obviously a string.",
+          "followUp": "How would you compare two strings ignoring case and culture correctly?",
+          "estSeconds": 90
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["collections"],
+          "prompt": "Match the collection to the job. Which are correct? Select all that apply.",
+          "choices": [
+            "`List<T>` — ordered, index access, the default choice",
+            "`Dictionary<K,V>` — O(1) lookup by key",
+            "`HashSet<T>` — uniqueness and fast Contains",
+            "`Array` — when the size is fixed and known",
+            "`IEnumerable<T>` — the best type for a field you'll add items to"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "`IEnumerable<T>` is a read-only, forward-only sequence with no Add and no Count — it's the right type for a *parameter* (accept the least you need) and often for a return, but not for something you build up. The usual guidance is: accept `IEnumerable<T>`, return `IReadOnlyList<T>` or a concrete list, store `List<T>`. Also worth knowing `Contains` on a `List<T>` is O(n) — a `HashSet<T>` in a loop is a common easy win.",
+          "followUp": "What's the risk of accepting `IEnumerable<T>` and enumerating it twice?",
+          "estSeconds": 75
+        },
+        {
+          "type": "fill",
+          "difficulty": 1,
+          "frequency": 2,
+          "tags": ["nullable"],
+          "prompt": "Safely get a length, defaulting to 0, from a possibly-null string.",
+          "code": "string? name = GetName();\nint length = name___.Length ___ 0;",
+          "language": "csharp",
+          "answer": ["?.", "??"],
+          "explanation": "`?.` short-circuits to null rather than throwing, and because `int` can't be null the expression's type becomes `int?` — so `??` supplies the fallback. These are the same operators as JavaScript with the same semantics, which is one of the genuinely free transfers between the two stacks. C# also has `??=` for compound assignment.",
+          "followUp": "What's the type of `name?.Length` before the `??` is applied, and why?",
+          "estSeconds": 45
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["boxing"],
+          "prompt": "What is boxing?",
+          "choices": [
+            "Wrapping a class in an interface",
+            "Converting a value type to a reference type by allocating it on the heap — and unboxing is the reverse",
+            "Encapsulating fields in properties",
+            "A garbage collection generation"
+          ],
+          "answer": 1,
+          "explanation": "Assigning an `int` to an `object` (or to a non-generic interface) allocates a heap object holding a copy. It's cheap once and expensive in a tight loop — allocation plus GC pressure plus a cast to get back out. Generics exist largely to avoid it: `List<int>` stores ints directly, where the old `ArrayList` boxed every one. It still shows up in `string.Format` with value-type arguments and in older non-generic APIs.",
+          "followUp": "Does `Console.WriteLine(42)` box?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["var", "typing"],
+          "prompt": "Is `var` in C# the same as `var` in JavaScript?",
+          "choices": [
+            "Yes — both are dynamically typed",
+            "No — C#'s `var` is compile-time type inference; the variable has one fixed static type and reassigning a different type is a compile error",
+            "No — C#'s `var` means `object`",
+            "Yes, but C#'s is block-scoped"
+          ],
+          "answer": 1,
+          "explanation": "`var x = 5;` compiles to exactly the same IL as `int x = 5;` — the type is inferred from the initialiser and then fixed forever. It's purely a way to avoid writing `Dictionary<string, List<Order>>` twice on one line. C#'s actual dynamic escape hatch is the `dynamic` keyword, which defers binding to runtime and is rare in application code.",
+          "followUp": "Where does overusing `var` genuinely hurt readability?",
+          "estSeconds": 45
+        }
+      ]
+    },
+    {
+      "slug": "cs-oop",
+      "name": "Classes, Interfaces & Records",
+      "level": "foundation",
+      "summary": "Interfaces vs abstract classes, properties, records, and the OOP vocabulary interviewers use.",
+      "interviewAngle": "'Interface or abstract class?' is the classic. They want a design answer, not a syntax recital.",
+      "keyPoints": [
+        "A class implements many interfaces but inherits one base class",
+        "Interfaces describe capability; abstract classes share implementation",
+        "Properties are methods in disguise — use them, not public fields",
+        "Records give value equality and immutability with almost no code",
+        "Favour composition over inheritance; deep hierarchies age badly"
+      ],
+      "items": [
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["interfaces", "abstract-classes"],
+          "prompt": "Interface or abstract class — how do you choose?",
+          "keywords": [
+            "multiple|many interfaces|one base class|single inheritance",
+            "contract|capability|can do|behaviour",
+            "shared|common implementation|shared code|state",
+            "is-a|relationship|hierarchy",
+            "test|mock|dependency injection|di"
+          ],
+          "modelAnswer": "An interface is a contract — it says what a type can do and carries no state. A class can implement any number of them, so they compose freely. An abstract class is a partially-built base: it can hold fields, constructors and shared implementation, but a class gets exactly one, so it's a commitment.\n\nSo I ask: is this an 'is-a' relationship with real shared code and state? Then abstract class. Is it a capability that unrelated types might have? Then interface.\n\nIn practice, in .NET, interfaces dominate — because dependency injection registers against them, and because mocking a concrete class for a test is painful. `IUserRepository` gets injected, and the test passes a fake. That's most of why the codebase is full of interfaces.\n\nWhen there's genuinely shared behaviour I'd usually rather have an interface plus a base class implementing it, or better, composition — inject a collaborator instead of inheriting from one. Deep inheritance hierarchies are the thing everyone regrets three years in.\n\nWorth mentioning that C# 8 added default interface implementations, which blurs the line, but they're mostly for library versioning rather than everyday design.",
+          "explanation": "Strong answers include the DI-and-mocking reason for .NET's interface-heavy style, and end up recommending composition.",
+          "followUp": "You have an interface with one implementation, created only for testing. Is that a good idea?",
+          "estSeconds": 210
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["records"],
+          "prompt": "What does `record` give you over `class`?",
+          "code": "public record User(string Name, int Age);",
+          "language": "csharp",
+          "choices": [
+            "Nothing — it's an alias",
+            "Value-based equality, a generated ToString, deconstruction, and `with` expressions for non-destructive copies",
+            "Automatic database mapping",
+            "Thread safety"
+          ],
+          "answer": 1,
+          "explanation": "Two records with the same values are `Equal` — where two classes with identical values are not, unless you write the equality yourself. You also get a readable `ToString`, positional deconstruction, and `user with { Age = 31 }` to copy-and-change. Positional records are init-only by default, so they suit DTOs, value objects and anything you pass around and compare. Use a class when identity matters more than value — an entity with an Id is still the same customer after a name change.",
+          "followUp": "What's the difference between `record` and `record struct`?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["virtual", "override"],
+          "prompt": "What does this print?",
+          "code": "class Base {\n    public virtual string Name() => \"Base\";\n    public string Describe() => $\"I am {Name()}\";\n}\nclass Derived : Base {\n    public override string Name() => \"Derived\";\n}\n\nConsole.WriteLine(new Derived().Describe());",
+          "language": "csharp",
+          "answer": "I am Derived",
+          "explanation": "`Name` is virtual, so the call inside `Describe` is dispatched on the runtime type — the derived override wins even though `Describe` is defined on the base. That's polymorphism, and it's the mechanism behind the template-method pattern. Had `Derived` used `new` instead of `override`, the base's version would have been called instead, which is exactly why `new` method hiding is a trap.",
+          "followUp": "What's the difference between `override` and `new` here?",
+          "estSeconds": 75
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["properties"],
+          "prompt": "Which are true about C# properties? Select all that apply.",
+          "choices": [
+            "They compile to get/set methods",
+            "`public int Age { get; set; }` generates a hidden backing field",
+            "`{ get; init; }` allows assignment only during object initialisation",
+            "They're identical to public fields",
+            "You can change a property's implementation later without breaking callers' compiled code"
+          ],
+          "answer": [0, 1, 2, 4],
+          "explanation": "Properties are methods, which is exactly why you use them instead of public fields: you can add validation, logging or laziness later without changing the API surface, and — importantly for libraries — swapping a field for a property is a binary-breaking change, so start with a property. Data binding, serialisers and EF Core also generally require properties, not fields. `init` gives you immutability after construction while still allowing object-initialiser syntax.",
+          "followUp": "Why does adding validation in a setter sometimes surprise people using object initialisers?",
+          "estSeconds": 75
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["interfaces", "di"],
+          "prompt": "Define an abstraction for user storage and a class that implements it.",
+          "code": "public ___ IUserRepository\n{\n    Task<User?> GetAsync(int id);\n}\n\npublic class SqlUserRepository ___ IUserRepository\n{\n    public Task<User?> GetAsync(int id) => /* ... */;\n}",
+          "language": "csharp",
+          "answer": ["interface", ":"],
+          "explanation": "C# uses a single `:` for both implementing an interface and inheriting a base class — if there's a base class it goes first, then interfaces. The `Task<User?>` return says two things at once: this is async, and the user may legitimately not exist. Notice the interface is named for what it provides, not for the technology behind it, which is what lets you swap the SQL implementation for an in-memory one in tests.",
+          "followUp": "Why doesn't the interface method have an `async` keyword?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["static", "instance"],
+          "prompt": "When is a `static` class or method the right choice?",
+          "choices": [
+            "Whenever you don't need to write `new`",
+            "For pure helpers with no state and no dependency you'd want to swap — like `Math.Max` or a string formatter",
+            "For anything used in more than one place",
+            "For database access, to avoid passing a context around"
+          ],
+          "answer": 1,
+          "explanation": "Static is fine for genuinely pure functions. It's a problem the moment there's state or a dependency, because you can't inject a replacement — a static `Database.Query()` can't be mocked, so anything calling it needs a real database in its tests, and static mutable state is a concurrency bug waiting for load. The tell is: could I want a different implementation here, ever? If yes, it's an instance behind an interface.",
+          "followUp": "How do you test code that calls `DateTime.Now` directly?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["idisposable"],
+          "prompt": "What does `using` do here?",
+          "code": "using var connection = new SqlConnection(connectionString);\nawait connection.OpenAsync();",
+          "language": "csharp",
+          "choices": [
+            "Imports a namespace",
+            "Guarantees `Dispose()` is called when the variable goes out of scope, even if an exception is thrown — releasing the unmanaged resource deterministically",
+            "Makes the object garbage collected immediately",
+            "Locks the object"
+          ],
+          "answer": 1,
+          "explanation": "The GC handles memory but not file handles, sockets or database connections, and it runs whenever it feels like it. `IDisposable` plus `using` gives deterministic cleanup: the compiler wraps the scope in try/finally so `Dispose` runs on every path. The declaration form (`using var x = ...`) disposes at the end of the enclosing block. Missing it is how you leak connections until the pool is exhausted — the same failure mode as forgetting `client.release()` in Node.",
+          "followUp": "What's `await using` for?",
+          "estSeconds": 75
+        },
+        {
+          "type": "order",
+          "difficulty": 2,
+          "frequency": 1,
+          "tags": ["solid"],
+          "prompt": "Match each SOLID letter to its principle — put them in S, O, L, I, D order.",
+          "choices": [
+            "A class should have one reason to change",
+            "Open for extension, closed for modification",
+            "A subtype must be usable anywhere its base type is expected",
+            "Many small interfaces beat one large one clients don't fully use",
+            "Depend on abstractions, not concrete implementations"
+          ],
+          "answer": [0, 1, 2, 3, 4],
+          "explanation": "Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion. The two that earn their keep daily are the first and the last: one reason to change keeps classes testable, and depending on abstractions is literally what DI containers automate. Liskov is the one people recite without an example — a good one is a `ReadOnlyList` that throws on `Add`, which breaks substitutability.",
+          "followUp": "Give a concrete violation of the Liskov principle you've actually seen.",
+          "estSeconds": 90
+        }
+      ]
+    },
+    {
+      "slug": "cs-linq",
+      "name": "LINQ & Collections",
+      "level": "working",
+      "summary": "Deferred execution, IEnumerable vs IQueryable, and the LINQ that becomes SQL.",
+      "interviewAngle": "The IEnumerable vs IQueryable question separates people who've used EF Core from people who've read about it.",
+      "keyPoints": [
+        "LINQ queries are deferred — nothing runs until you enumerate",
+        "IQueryable builds an expression tree the provider translates to SQL",
+        "Casting to IEnumerable forces the rest of the query to run in memory",
+        "First/Single/FirstOrDefault differ in what they do when there are zero or many matches",
+        "Enumerating the same IEnumerable twice runs the work twice"
+      ],
+      "items": [
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["deferred-execution"],
+          "prompt": "What does this print?",
+          "code": "var numbers = new List<int> { 1, 2, 3 };\nvar evens = numbers.Where(n => n % 2 == 0);\n\nnumbers.Add(4);\n\nConsole.WriteLine(string.Join(\",\", evens));",
+          "language": "csharp",
+          "answer": "2,4",
+          "explanation": "`Where` doesn't filter anything when it's called — it returns a lazy query that remembers the source and the predicate. The filtering happens when `string.Join` enumerates it, by which time the list has a 4. Add `.ToList()` after `Where` and you'd get just `2`, because that forces immediate execution against the list as it was. Deferred execution is a feature when you're composing queries and a bug when the source changes underneath you.",
+          "followUp": "How does deferred execution combine with a `using` block around a DbContext?",
+          "estSeconds": 90
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": ["iqueryable", "ienumerable"],
+          "prompt": "What's the difference between `IEnumerable<T>` and `IQueryable<T>`, and why does it matter in EF Core?",
+          "keywords": [
+            "expression tree|expression",
+            "sql|translate|translated|database",
+            "memory|in memory|client side|client",
+            "delegate|func|lambda compiled",
+            "all rows|whole table|fetch everything|performance"
+          ],
+          "modelAnswer": "`IEnumerable<T>` takes a compiled delegate and iterates in memory — LINQ to Objects. `IQueryable<T>` takes the lambda as an *expression tree*, a data structure describing the code, which a provider like EF Core walks and translates into SQL.\n\nThe consequence: with `IQueryable`, `Where`, `OrderBy`, `Skip` and `Take` are composed and sent to the database, which returns only the matching rows. With `IEnumerable`, they run on whatever is already in memory.\n\nThe classic bug is switching from one to the other by accident:\n\n```\nvar users = context.Users.AsEnumerable().Where(u => u.IsActive);\n```\n\nThat `AsEnumerable()` pulls the entire Users table across the wire and filters it in your process. It's fine at 100 rows and takes the app down at a million. The same thing happens if you return `IEnumerable<User>` from a repository method and callers add a `Where` — the filtering is now client-side and you've lost the ability to push it down.\n\nIt also happens when EF can't translate something — calling your own C# method inside a `Where`. Older EF versions silently evaluated it client-side; EF Core throws instead, which is much better, because a thrown exception is easier to find than a silent full table scan.",
+          "explanation": "The core is expression tree vs delegate, translated to SQL vs run in memory, and the `AsEnumerable` trap. Mentioning that EF Core now throws rather than silently degrading is a strong detail.",
+          "followUp": "So what type should a repository method return, and why?",
+          "estSeconds": 240
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["linq", "first-single"],
+          "prompt": "The table has three users named 'Al'. Which call throws?",
+          "choices": [
+            "users.First(u => u.Name == \"Al\")",
+            "users.FirstOrDefault(u => u.Name == \"Al\")",
+            "users.Single(u => u.Name == \"Al\")",
+            "users.Where(u => u.Name == \"Al\").ToList()"
+          ],
+          "answer": 2,
+          "explanation": "`Single` asserts there is exactly one match and throws when there are none *or* several. `First` takes the first and only throws when there are none; `FirstOrDefault` returns null instead. Use `Single` when a duplicate would mean your data is corrupt and you want to know loudly — a lookup by primary key. Use `First` when 'any match' is genuinely acceptable, and give it an `OrderBy` so 'first' means something deterministic.",
+          "followUp": "Which would you use to fetch a user by primary key, and why?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["linq", "projection"],
+          "prompt": "Get the names of active users, alphabetically, as a list.",
+          "code": "var names = users\n    .___(u => u.IsActive)\n    .___(u => u.Name)\n    .___(n => n)\n    .ToList();",
+          "language": "csharp",
+          "answer": ["Where", "Select", "OrderBy"],
+          "explanation": "`Where` filters, `Select` projects, `OrderBy` sorts, `ToList` executes. Ordering matters for performance: filtering before projecting means less work, and in EF Core the whole chain becomes one SQL statement — `SELECT Name FROM Users WHERE IsActive = 1 ORDER BY Name`. Selecting only the column you need rather than whole entities is one of the easiest EF Core wins, and it also avoids change-tracking overhead.",
+          "followUp": "How does adding `.ToList()` earlier in the chain change the generated SQL?",
+          "estSeconds": 75
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["multiple-enumeration"],
+          "prompt": "`GetUsers()` returns `IEnumerable<User>` backed by a database query. How many times does the query run?",
+          "code": "var users = GetUsers();\n\nif (users.Any())\n{\n    Console.WriteLine(users.Count());\n    foreach (var u in users) { /* ... */ }\n}",
+          "language": "csharp",
+          "answer": "three times",
+          "explanation": "`Any()`, `Count()` and the `foreach` each enumerate the sequence, and a deferred query re-executes from scratch every time. Three round trips for what should be one. This is what the 'possible multiple enumeration' warning in Rider and ReSharper is telling you. Fix it by materialising once with `.ToList()` and working from that — or, if you only need the count, ask the database for the count instead of fetching all the rows to count them locally.",
+          "followUp": "When is multiple enumeration actually harmless?",
+          "estSeconds": 90
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["linq", "methods"],
+          "prompt": "Which LINQ methods execute immediately rather than deferring? Select all that apply.",
+          "choices": ["ToList", "Where", "Count", "Select", "Any", "OrderBy"],
+          "answer": [0, 2, 4],
+          "explanation": "The rule is simple: anything returning a *sequence* defers; anything returning a single value or a materialised collection executes. So `Where`, `Select` and `OrderBy` build up the query, while `ToList`, `ToArray`, `Count`, `Any`, `First`, `Sum` and `Max` run it. `OrderBy` catches people out — it defers, but when it does run it has to buffer the whole sequence to sort it.",
+          "followUp": "Why does `OrderBy` need to buffer everything, when `Where` doesn't?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["grouping"],
+          "prompt": "Which LINQ produces 'the number of orders per customer'?",
+          "choices": [
+            "orders.Select(o => o.CustomerId).Count()",
+            "orders.GroupBy(o => o.CustomerId).Select(g => new { CustomerId = g.Key, Count = g.Count() })",
+            "orders.Distinct().Count()",
+            "orders.OrderBy(o => o.CustomerId).Count()"
+          ],
+          "answer": 1,
+          "explanation": "`GroupBy` produces a sequence of groups, each with a `Key` and the items in it, and projecting `g.Key` with `g.Count()` gives one row per customer. In EF Core this translates to a real `GROUP BY` — but only if you keep it as `IQueryable`; group by after `AsEnumerable()` pulls every order into memory first. Note that `GroupBy` translation has historically been the flakiest part of EF Core, so it's worth checking the generated SQL.",
+          "followUp": "How would you also include customers with zero orders?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["linq", "readability"],
+          "prompt": "When is a `foreach` loop better than a LINQ chain?",
+          "choices": [
+            "Never — LINQ is always preferable",
+            "When you're doing side effects, need early exit with complex conditions, or the chain has become harder to read than the loop",
+            "When performance matters at all",
+            "Only in older C# versions"
+          ],
+          "answer": 1,
+          "explanation": "LINQ describes *what* you want and reads beautifully for filter-project-aggregate. It reads badly when the body has side effects, when you need to break out on a compound condition, or when the chain grows to eight operators with nested lambdas. There's a small allocation and delegate-call overhead too, which matters only in genuinely hot paths — and you'd measure before caring. The honest rule is readability first, and both tools are legitimate.",
+          "followUp": "What's the LINQ equivalent of `break`, and why is there no `ForEach` on IEnumerable?",
+          "estSeconds": 60
+        }
+      ]
+    },
+    {
+      "slug": "cs-async",
+      "name": "async/await & Tasks",
+      "level": "working",
+      "summary": "What await really does, why .Result deadlocks, cancellation, and running work in parallel.",
+      "interviewAngle": "'Why shouldn't you call .Result on a Task?' is a standard senior-screening question, and the answer involves the synchronisation context.",
+      "keyPoints": [
+        "await releases the thread; it doesn't create one",
+        ".Result and .Wait() block the thread and can deadlock in contexts with a synchronisation context",
+        "async void is fire-and-forget with uncatchable exceptions — only for event handlers",
+        "Task.WhenAll runs work concurrently; sequential awaits don't",
+        "Pass a CancellationToken all the way down so work can actually stop"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["async", "threads"],
+          "prompt": "Does `await` create a new thread?",
+          "choices": [
+            "Yes — every await runs on a new thread",
+            "No — for I/O the thread is released back to the pool while waiting, and the continuation is scheduled when the operation completes",
+            "Yes, but only for I/O",
+            "No — await runs everything synchronously"
+          ],
+          "answer": 1,
+          "explanation": "This is the most misunderstood thing about async. For genuine I/O there's no thread waiting at all — the OS signals completion and the runtime schedules your continuation on a pool thread. That's why a server handles far more concurrent requests: threads aren't parked on network waits. `Task.Run` *is* a different thing — it moves CPU work onto a pool thread, which is right for compute and pointless (actively harmful, on a server) for I/O.",
+          "followUp": "So when is `Task.Run` the right call in an ASP.NET Core app?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": ["deadlock", "sync-over-async"],
+          "prompt": "Why can calling `.Result` on a Task deadlock, and what should you do instead?",
+          "keywords": [
+            "block|blocks|blocking",
+            "synchronization context|sync context|context",
+            "resume|continuation|back onto",
+            "deadlock|waiting|never completes",
+            "async all the way|await"
+          ],
+          "modelAnswer": "In a context with a synchronisation context — classic ASP.NET, WinForms, WPF — the continuation after an `await` is scheduled back onto that context's single thread. If that same thread is blocked inside `.Result` waiting for the task, the continuation can never run, so the task never completes, so `.Result` never returns. Both sides wait forever.\n\nThe fix is 'async all the way': make the caller async and `await` instead of blocking. If a library forced the issue you could use `ConfigureAwait(false)` on every await inside it so continuations don't need the context — that's why library code is full of it.\n\nASP.NET Core removed the synchronisation context, so this specific deadlock doesn't happen there any more, and `ConfigureAwait(false)` is unnecessary in app code. But sync-over-async is still bad: blocking a request thread while waiting occupies a thread pool thread doing nothing, and under load the pool grows slowly (roughly one thread per second), so throughput collapses — thread pool starvation. Same symptom, different mechanism.\n\nThe only place I'd block is a console `Main` before C# 7.1, or a genuinely sync entry point I can't change.",
+          "explanation": "The full answer names the synchronisation context for the deadlock, notes ASP.NET Core changed it, and still argues against blocking because of thread pool starvation.",
+          "followUp": "What does `ConfigureAwait(false)` actually change, and why doesn't app code need it now?",
+          "estSeconds": 240
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["parallel", "whenall"],
+          "prompt": "Each call takes 1 second. Roughly how long does each version take?",
+          "code": "// A\nvar a = await GetUserAsync();\nvar b = await GetOrdersAsync();\n\n// B\nvar ta = GetUserAsync();\nvar tb = GetOrdersAsync();\nawait Task.WhenAll(ta, tb);",
+          "language": "csharp",
+          "answer": "A: 2 seconds, B: 1 second",
+          "explanation": "In A each `await` waits for that call to finish before the next one starts. In B both tasks are started first — a method returns its Task as soon as it hits its first real await, so the second call goes out while the first is in flight — and `WhenAll` waits for both. Only use B when the calls are independent; if the second needs the first one's id, sequential is the only option. Retrieve results with `ta.Result` after `WhenAll` (safe now, it's complete) or `await Task.WhenAll` on typed tasks.",
+          "followUp": "What happens to the other task if one of them throws?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": ["async-void"],
+          "prompt": "Why is `async void` dangerous?",
+          "choices": [
+            "It's slower",
+            "The caller can't await it, so exceptions escape to the thread and usually crash the process instead of being catchable",
+            "It doesn't compile",
+            "It blocks the thread"
+          ],
+          "answer": 1,
+          "explanation": "`async Task` gives the caller something to await, so failures surface as a faulted task you can catch. `async void` returns nothing — the method fires off, the caller carries on, and an exception is rethrown on whatever context is current, typically taking the process down. You also can't tell when it finished, so tests race it. The one legitimate use is an event handler, whose signature you don't control, and even then the body should be wrapped in try/catch.",
+          "followUp": "How would you make a fire-and-forget background task safe?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["cancellation"],
+          "prompt": "Accept and forward a cancellation token.",
+          "code": "public async Task<User?> GetAsync(int id, ___ ct = default)\n{\n    return await _db.Users\n        .FirstOrDefaultAsync(u => u.Id == id, ___);\n}",
+          "language": "csharp",
+          "answer": ["CancellationToken", "ct"],
+          "explanation": "The token has to be threaded all the way down to the operation that can actually stop — accepting one and not passing it on is worse than not accepting it, because the signature promises something it doesn't do. In ASP.NET Core, a controller action parameter of type `CancellationToken` is bound automatically to the request's token, so when the client disconnects the database query is cancelled instead of running on for nobody.",
+          "followUp": "What exception does a cancelled operation throw, and should you log it as an error?",
+          "estSeconds": 75
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["async", "practices"],
+          "prompt": "Which are good async practice in a web API? Select all that apply.",
+          "choices": [
+            "Make the whole call chain async rather than blocking at any level",
+            "Use `Task.Run` to wrap database calls so they don't block",
+            "Return `Task<T>` rather than `void` from async methods",
+            "Accept a CancellationToken on long-running operations",
+            "Use `Task.WhenAll` for independent concurrent work"
+          ],
+          "answer": [0, 2, 3, 4],
+          "explanation": "Wrapping an already-async database call in `Task.Run` is a classic mistake — it doesn't make anything faster, it just occupies an extra pool thread to sit and await something that was already non-blocking. `Task.Run` is for CPU-bound work, and on a server even that is usually better as a queued background job than as a thread grabbed mid-request.",
+          "followUp": "Why does `Task.Run` around an async method actively reduce throughput?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["exceptions", "tasks"],
+          "prompt": "Three tasks in `Task.WhenAll` fail. What does `await Task.WhenAll(...)` throw?",
+          "choices": [
+            "An AggregateException containing all three",
+            "The first exception only — though the Task's `Exception` property holds the AggregateException with all of them",
+            "Nothing; you must check each task",
+            "A TaskCanceledException"
+          ],
+          "answer": 1,
+          "explanation": "`await` unwraps the AggregateException and rethrows the first inner exception, because rethrowing an aggregate would make every catch block awkward. The others aren't lost — they're on the task's `Exception` property. So if you need to report all failures, catch, then inspect `task.Exception.InnerExceptions` or check each task individually. Blocking with `.Wait()` or `.Result` throws the AggregateException itself, which is a subtle behaviour difference between the two.",
+          "followUp": "How would you collect and report every failure rather than just the first?",
+          "estSeconds": 90
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["async", "loops"],
+          "prompt": "What's the performance problem, and is there a case where it's correct?",
+          "code": "foreach (var id in ids)\n{\n    var user = await GetUserAsync(id);\n    results.Add(user);\n}",
+          "language": "csharp",
+          "answer": "sequential — each call waits for the previous; correct when order matters, when calls depend on each other, or to limit load",
+          "explanation": "Same shape as the JavaScript version: N awaits in a loop is N round trips end to end. `await Task.WhenAll(ids.Select(GetUserAsync))` makes them concurrent. But sequential is deliberately right when each call depends on the last, when you must preserve strict ordering of side effects, or when firing 5,000 concurrent requests would exhaust the connection pool or trip the remote API's rate limit. In that middle case the answer is bounded concurrency — `SemaphoreSlim` or `Parallel.ForEachAsync` with a `MaxDegreeOfParallelism` — not one extreme or the other.",
+          "followUp": "How would you cap it at 10 concurrent calls?",
+          "estSeconds": 120
+        }
+      ]
+    },
+    {
+      "slug": "cs-modern",
+      "name": "Modern C# & Exceptions",
+      "level": "professional",
+      "summary": "Pattern matching, expression-bodied members, exception practice, and the features that show up in current codebases.",
+      "interviewAngle": "Interviewers use modern syntax questions to gauge whether you've worked on a recent codebase or a 2015 one.",
+      "keyPoints": [
+        "`throw;` preserves the original stack trace — `throw ex;` destroys it",
+        "Catch specific exception types, and only where you can act",
+        "Pattern matching with switch expressions replaces long if/else ladders",
+        "Exceptions are for exceptional cases, not for control flow — they're expensive",
+        "Prefer `TryParse` and result types over throwing for expected failures"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["exceptions", "stack-trace"],
+          "prompt": "What's the difference between `throw;` and `throw ex;` inside a catch block?",
+          "choices": [
+            "None",
+            "`throw;` rethrows preserving the original stack trace; `throw ex;` resets it to this line, hiding where the error really came from",
+            "`throw ex;` is faster",
+            "`throw;` only works for custom exceptions"
+          ],
+          "answer": 1,
+          "explanation": "`throw ex;` restarts the stack trace at the rethrow point, so your log says the error happened in the catch block rather than 12 frames down where it actually did. It's one of the most common ways teams lose debugging information. Use bare `throw;` to rethrow, or wrap with `throw new SomethingException(\"context\", ex)` — passing the original as the inner exception keeps the whole chain.",
+          "followUp": "When is wrapping in a new exception better than rethrowing?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["pattern-matching"],
+          "prompt": "Rewrite a status-to-message mapping as a switch expression.",
+          "code": "string Describe(Status s) => s ___\n{\n    Status.Draft => \"Not published\",\n    Status.Live => \"Visible to everyone\",\n    ___ => throw new ArgumentOutOfRangeException(nameof(s)),\n};",
+          "language": "csharp",
+          "answer": ["switch", "_"],
+          "explanation": "The switch *expression* (C# 8) returns a value, so there's no `break`, no fall-through and no uninitialised-variable dance. The `_` discard is the catch-all. The compiler warns if you haven't covered every enum member, which is C#'s version of exhaustiveness checking — though enums aren't closed at runtime, so keeping the throwing default is still worthwhile.",
+          "followUp": "How do property patterns extend this beyond simple enum matching?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["exceptions", "control-flow"],
+          "prompt": "Parsing user-supplied numbers. Which is better and why?",
+          "code": "// A\ntry { value = int.Parse(input); }\ncatch (FormatException) { value = 0; }\n\n// B\nif (!int.TryParse(input, out var value)) value = 0;",
+          "language": "csharp",
+          "choices": [
+            "A — clearer intent",
+            "B — invalid input is expected, not exceptional; throwing and catching costs orders of magnitude more than a bool return, and it reads better",
+            "They're equivalent",
+            "A — TryParse can't handle nulls"
+          ],
+          "answer": 1,
+          "explanation": "Throwing captures a stack trace and unwinds the stack — microseconds rather than nanoseconds, which shows up when you're validating a large upload row by row. But the design argument is stronger than the performance one: bad user input is a normal, expected outcome, and using exceptions for it means your catch blocks are load-bearing control flow. Reserve exceptions for cases the caller genuinely can't anticipate.",
+          "followUp": "Where does the `Result<T>` pattern fit in a C# codebase?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["pattern-matching"],
+          "prompt": "What does this print for `Describe(new Circle(5))`?",
+          "code": "record Shape;\nrecord Circle(double R) : Shape;\nrecord Square(double S) : Shape;\n\nstring Describe(Shape shape) => shape switch\n{\n    Circle { R: > 10 } => \"big circle\",\n    Circle c => $\"circle r={c.R}\",\n    Square => \"square\",\n    _ => \"unknown\",\n};",
+          "language": "csharp",
+          "answer": "circle r=5",
+          "explanation": "Patterns are tested top to bottom. The first arm uses a property pattern with a relational check — radius greater than 10 — which 5 fails. The second matches any Circle and binds it to `c`. Order matters: put the specific arm before the general one or it's unreachable, and the compiler will tell you when it can prove that. This combination of type, property and relational patterns is what replaced towers of `if (x is Circle circle && circle.R > 10)`.",
+          "followUp": "What's a list pattern, and when would you use one?",
+          "estSeconds": 90
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["exceptions", "practice"],
+          "prompt": "Which are good exception practice? Select all that apply.",
+          "choices": [
+            "Catch the most specific exception type you can handle",
+            "Catch `Exception` at the top-level boundary to log and return a 500",
+            "Use `catch (SqlException) { }` to ignore transient database errors",
+            "Include context in the message — which id, which operation",
+            "Let exceptions you can't handle propagate"
+          ],
+          "answer": [0, 1, 3, 4],
+          "explanation": "Silently swallowing a database error means the operation quietly did nothing and the user thinks it worked — if you're handling transients, retry with backoff and give up loudly. A single broad catch at the outermost boundary is correct and necessary: something has to turn an unexpected failure into a logged 500 rather than a dead process. Everywhere else, catch what you can actually do something about.",
+          "followUp": "What's an exception filter (`when`), and how does it beat catching-and-rethrowing?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["syntax", "modern"],
+          "prompt": "What does this C# feature do?",
+          "code": "public string FullName => $\"{First} {Last}\";",
+          "language": "csharp",
+          "choices": [
+            "Declares a field with a default value",
+            "An expression-bodied read-only property — equivalent to a getter returning that expression, recomputed on each access",
+            "An auto-property with an initialiser",
+            "A lambda assigned to a property"
+          ],
+          "answer": 1,
+          "explanation": "`=>` on a member means 'the body is this expression'. For a property it's a get-only computed property, evaluated every time it's read — not stored, so it stays correct when First or Last change. Compare `public string FullName { get; } = $\"{First} {Last}\";`, which computes once in the constructor and then goes stale. The same syntax works for methods, constructors and indexers.",
+          "followUp": "Which of those two would you want for an expensive computation?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["gc", "memory"],
+          "prompt": "You have a garbage collector. What can still leak, and how would you find it?",
+          "keywords": [
+            "event|event handler|subscription|unsubscribe",
+            "static|static reference|cache|dictionary",
+            "idisposable|dispose|unmanaged|handle|connection",
+            "root|reachable|still referenced",
+            "profiler|dump|memory profiler|dotnet-counters"
+          ],
+          "modelAnswer": "The GC collects what's unreachable, so a 'leak' in .NET is really an unintended reference keeping something alive.\n\nThe common causes. Event handlers: subscribing to a long-lived publisher creates a strong reference from publisher to subscriber, so the subscriber never dies until you unsubscribe. Static collections used as caches, with no eviction — the classic unbounded `static Dictionary`. Captured variables in a closure or a long-running timer holding a whole object graph. And `IDisposable` types where the memory is collectable but the underlying handle, socket or connection isn't released until Dispose runs, which exhausts a pool long before it exhausts memory.\n\nTo find one I'd watch the process over time — `dotnet-counters` on gen 2 size and heap — to confirm it's actually growing rather than just being a large working set. Then take two memory dumps a few minutes apart and diff them, or use a profiler's snapshot comparison, to see which type is growing. The profiler will show the reference chain holding the objects, which usually names the culprit immediately.\n\nAlso worth ruling out that it isn't a leak at all: the Large Object Heap fragmenting, or a `ServerGarbageCollection` setting that makes the process look greedy while being perfectly healthy.",
+          "explanation": "Event handlers and static caches are the two answers they're listening for. Describing the two-dump diff shows you've actually chased one down.",
+          "followUp": "Why do event handlers specifically cause this, and what's the standard fix?",
+          "estSeconds": 210
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["null-checks"],
+          "prompt": "Guard a constructor argument concisely.",
+          "code": "public UserService(IUserRepository repo)\n{\n    _repo = repo ___ throw new ArgumentNullException(nameof(repo));\n}",
+          "language": "csharp",
+          "answer": ["??"],
+          "explanation": "`??` with a `throw` expression on the right is the idiomatic guard — assign if non-null, throw otherwise, in one line. `nameof(repo)` gives the parameter name as a string that survives renames, so the error message never drifts. Newer code often uses `ArgumentNullException.ThrowIfNull(repo)` instead, which is clearer still. With DI providing the dependency this guard is arguably redundant, but it documents the invariant and catches the manual-construction case.",
+          "followUp": "Why is `nameof` better than the literal string \"repo\"?",
+          "estSeconds": 60
+        }
+      ]
+    }
+  ]
+}

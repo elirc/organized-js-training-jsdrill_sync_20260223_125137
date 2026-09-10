@@ -1,0 +1,743 @@
+{
+  "track": {
+    "id": "trk-node",
+    "slug": "node",
+    "name": "Node & APIs",
+    "tagline": "The server side of the JavaScript stack, and the REST design behind it",
+    "description": "The Node runtime and its module system, building an Express-style API, REST conventions that reviewers actually check, talking to a database without N+1 queries, and the auth and security basics every backend interview covers.",
+    "icon": "⬢",
+    "accent": "emerald",
+    "sortOrder": 4
+  },
+  "modules": [
+    {
+      "slug": "node-runtime",
+      "name": "The Node Runtime",
+      "level": "foundation",
+      "summary": "Single-threaded but non-blocking, npm and package.json, environment config, and what blocks the loop.",
+      "interviewAngle": "'Node is single-threaded — how does it handle thousands of connections?' is asked constantly. So is the difference between dependencies and devDependencies.",
+      "keyPoints": [
+        "One thread runs your JavaScript; I/O is delegated to the OS and libuv's thread pool",
+        "CPU-bound work blocks every request — offload it to a worker thread or another service",
+        "package.json `dependencies` ship to production; `devDependencies` don't",
+        "The lockfile pins exact versions — commit it, and use `npm ci` in CI",
+        "Configuration comes from environment variables, never from committed files"
+      ],
+      "items": [
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["event-loop", "concurrency"],
+          "prompt": "Node is single-threaded. How does it serve thousands of concurrent requests?",
+          "keywords": [
+            "event loop",
+            "non-blocking|asynchronous|async i/o",
+            "libuv|thread pool|os|kernel",
+            "callback|queue|resume",
+            "cpu bound|blocking|block"
+          ],
+          "modelAnswer": "Single-threaded refers to the JavaScript execution thread. When your code starts a database query or reads a file, Node doesn't sit and wait — it hands the operation to libuv, which uses OS-level async I/O (epoll, kqueue, IOCP) or a small thread pool, and registers a callback. The JS thread is immediately free to handle the next request.\n\nWhen the operation finishes, the callback goes on a queue, and the event loop picks it up next time the stack is empty. So a thousand concurrent requests are a thousand pending callbacks, not a thousand threads — which is why Node uses so much less memory per connection than a thread-per-request model.\n\nThe catch is that it only works while every request spends most of its time waiting on I/O. A CPU-bound operation — resizing an image, hashing a password with a high cost factor, parsing a 50MB JSON blob — occupies the one thread and every other request queues behind it. There's no preemption; your function runs to completion.\n\nSo for CPU work you use `worker_threads`, push it to a queue and a separate worker process, or hand it to a service better suited to it. And you scale across cores with the cluster module or, in practice, several container instances behind a load balancer.",
+          "explanation": "The full answer names the event loop, says I/O is delegated rather than awaited, and — crucially — identifies CPU-bound work as the thing that breaks the model.",
+          "followUp": "Which parts of Node actually use the libuv thread pool?",
+          "estSeconds": 210
+        },
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["npm", "package-json"],
+          "prompt": "What's the difference between `dependencies` and `devDependencies`?",
+          "choices": [
+            "None — npm installs both identically",
+            "`dependencies` are needed to run the app in production; `devDependencies` are only needed to build and test it, and are skipped by `npm ci --omit=dev`",
+            "`devDependencies` are installed globally",
+            "`dependencies` are locked; `devDependencies` are not"
+          ],
+          "answer": 1,
+          "explanation": "The split matters for image size and attack surface: your production container shouldn't ship TypeScript, ESLint and a test runner. Common mistakes are putting `typescript` in `dependencies` (it's a build tool) or putting `@types/*` in `dependencies` (they vanish at runtime). Note that if you build inside the container you still need the dev deps at build time — that's what a multi-stage Dockerfile is for.",
+          "followUp": "Where do `peerDependencies` fit in?",
+          "estSeconds": 45
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["semver", "lockfile"],
+          "prompt": "Your `package.json` says `\"express\": \"^4.18.0\"`. Which versions can npm install?",
+          "choices": [
+            "Exactly 4.18.0",
+            "Any 4.x.x at or above 4.18.0 — minor and patch updates, but not 5.0.0",
+            "Any version at or above 4.18.0, including 5.x",
+            "Only patch updates: 4.18.x"
+          ],
+          "answer": 1,
+          "explanation": "`^` allows changes that don't alter the leftmost non-zero digit — so minor and patch, but never a major. `~4.18.0` would allow patch only. This is why the lockfile matters: `^` means two developers installing a month apart can get different code from identical package.json files. Commit `package-lock.json` and use `npm ci` in CI, which installs exactly what the lockfile says and fails if the two files disagree.",
+          "followUp": "What does `^0.5.2` allow, and why is that different?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["blocking", "event-loop"],
+          "prompt": "This endpoint works fine in testing and falls over under load. What's wrong?",
+          "code": "app.get('/report', (req, res) => {\n  const rows = fs.readFileSync('./big.csv', 'utf8').split('\\n');\n  const parsed = rows.map(expensiveParse);\n  res.json(parsed);\n});",
+          "language": "js",
+          "answer": "readFileSync and the synchronous parse block the event loop, so every other request stalls",
+          "explanation": "Two problems on one line. `readFileSync` blocks the single JS thread for the whole read — under concurrency, every other request waits. Then `expensiveParse` over every row blocks it again, and this one can't be fixed by making it async, because it's CPU work. Use `fs.promises.readFile` (or a stream) for the I/O, and move the parsing to a worker thread or precompute it. Sync APIs are fine at startup, never per-request.",
+          "followUp": "How would you detect event-loop blocking in production?",
+          "estSeconds": 90
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["config", "env"],
+          "prompt": "Which are correct for handling configuration and secrets? Select all that apply.",
+          "choices": [
+            "Read config from `process.env`",
+            "Commit `.env` so everyone has the same settings",
+            "Validate required env vars at startup and crash if they're missing",
+            "Keep a `.env.example` with the key names and dummy values",
+            "Fall back to a hardcoded production database URL if the env var is absent"
+          ],
+          "answer": [0, 2, 3],
+          "explanation": "`.env` holds secrets and must be gitignored — `.env.example` documents the shape without the values. Validating at startup turns a 3am `undefined is not a valid connection string` into an immediate, obvious boot failure; a schema parse over `process.env` gives you typed config for free. And a hardcoded production fallback is how staging ends up writing to the production database.",
+          "followUp": "Where do the actual secrets come from in production, if not a file?",
+          "estSeconds": 75
+        },
+        {
+          "type": "fill",
+          "difficulty": 1,
+          "frequency": 2,
+          "tags": ["esm", "node"],
+          "prompt": "Make a Node package use ES modules.",
+          "code": "{\n  \"name\": \"api\",\n  \"___\": \"module\",\n  \"scripts\": { \"start\": \"node src/index.js\" }\n}",
+          "language": "json",
+          "answer": ["type"],
+          "explanation": "`\"type\": \"module\"` makes every `.js` file in the package an ES module — `import` works, `require` and `__dirname` don't. You can opt individual files back to CommonJS with the `.cjs` extension, or opt into ESM in a CJS package with `.mjs`. The ESM replacement for `__dirname` is `import.meta.dirname` (Node 20.11+), or the older `fileURLToPath(import.meta.url)` dance.",
+          "followUp": "What else breaks when you flip a CommonJS project to ESM?",
+          "estSeconds": 45
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["streams"],
+          "prompt": "You need to serve a 2GB file download. Why stream it instead of reading it into memory?",
+          "choices": [
+            "Streaming is easier to write",
+            "Reading it whole allocates 2GB per concurrent request — streaming sends it in chunks with near-constant memory, and the client starts receiving immediately",
+            "Streams are faster on disk",
+            "Node can't read files over 1GB"
+          ],
+          "answer": 1,
+          "explanation": "Memory is the reason. Ten concurrent downloads of a buffered 2GB file is 20GB of RAM and an OOM kill; streamed, it's a few megabytes of buffers. You also get time-to-first-byte: the client starts downloading while you're still reading. Streams handle backpressure automatically — if the client is slow, `pipe` stops pulling from the source. This same argument applies to CSV exports and large query results.",
+          "followUp": "What is backpressure and what happens if you ignore it?",
+          "estSeconds": 60
+        },
+        {
+          "type": "order",
+          "difficulty": 2,
+          "frequency": 1,
+          "tags": ["deployment"],
+          "prompt": "Order the stages of a sensible Node deploy pipeline.",
+          "choices": [
+            "Install exactly what the lockfile says with `npm ci`",
+            "Type-check, lint and run the test suite",
+            "Build the production bundle and prune dev dependencies",
+            "Start the app with a process manager and a health check endpoint"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "`npm ci` first, because everything after depends on the exact dependency tree — and it fails loudly if the lockfile is out of sync with package.json. Checks before build, so you fail fast on the cheap steps. Prune dev deps after the build, since the build needs them. Then run under something that restarts on crash, with a health endpoint the orchestrator can poll to know when to route traffic.",
+          "followUp": "What should a health check actually check — and what shouldn't it?",
+          "estSeconds": 75
+        }
+      ]
+    },
+    {
+      "slug": "express-api",
+      "name": "Building an HTTP API",
+      "level": "foundation",
+      "summary": "Routing, middleware order, request parsing, status codes and a single error handler.",
+      "interviewAngle": "Middleware order questions are a reliable filter: if you don't know that `next()` and ordering matter, you haven't built one.",
+      "keyPoints": [
+        "Middleware runs in registration order — the first matching handler that doesn't call next() ends it",
+        "An error handler has four parameters: (err, req, res, next)",
+        "Send exactly one response per request; a second send throws",
+        "Async handler errors don't reach the error middleware in Express 4 unless you forward them",
+        "Route params, query strings and bodies are three different inputs, all untrusted"
+      ],
+      "items": [
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["middleware", "order"],
+          "prompt": "Requests to `/admin/users` are never authenticated. Why?",
+          "code": "app.get('/admin/users', listUsers);\napp.use(requireAuth);\napp.get('/admin/settings', getSettings);",
+          "language": "js",
+          "answer": "requireAuth is registered after the route, so it never runs for /admin/users",
+          "explanation": "Express walks the stack in registration order. `/admin/users` matches the first handler, which sends a response, and nothing after it runs. `/admin/settings` is registered after `requireAuth`, so it's protected. This ordering bug is a real security hole and a favourite interview question — the fix is to mount auth before any protected route, ideally on a router (`app.use('/admin', requireAuth, adminRouter)`) so it can't be forgotten per-route.",
+          "followUp": "How would you structure the app so a new admin route is protected by default?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["error-handling", "async"],
+          "prompt": "In Express 4, what happens when this handler's promise rejects?",
+          "code": "app.get('/users/:id', async (req, res) => {\n  const user = await db.findUser(req.params.id); // throws\n  res.json(user);\n});",
+          "language": "js",
+          "choices": [
+            "The error middleware catches it and returns 500",
+            "Express 4 doesn't await the handler, so the rejection is unhandled — the request hangs until it times out",
+            "Express returns 404",
+            "The process crashes immediately"
+          ],
+          "answer": 1,
+          "explanation": "Express 4 calls your handler and ignores the returned promise, so a rejection never reaches `next(err)`. The client gets nothing until the socket times out, which is worse than a 500 because nothing is logged. Fixes: wrap handlers in an `asyncHandler` that catches and forwards, use `express-async-errors`, or upgrade to Express 5, which awaits handlers and forwards rejections automatically.",
+          "followUp": "Write the asyncHandler wrapper.",
+          "estSeconds": 75
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["error-middleware"],
+          "prompt": "Complete the central error handler.",
+          "code": "app.use((___, req, res, next) => {\n  logger.error({ err, path: req.path });\n  const status = err.status ___ 500;\n  res.status(status).json({\n    error: status === 500 ? 'Internal server error' : err.message,\n  });\n});",
+          "language": "js",
+          "answer": ["err", "??"],
+          "explanation": "Express identifies error middleware purely by arity — four parameters means error handler, and it must be registered *last*. The `??` preserves a legitimate `err.status` while defaulting unknown failures to 500. Note the 500 branch sends a generic message: unrecognised errors may contain SQL, file paths or library internals you don't want a client to see. Log the detail; return the generic.",
+          "followUp": "Why does the error handler need `next` in its signature if it doesn't call it?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["http", "status-codes"],
+          "prompt": "A POST to `/users` succeeds and creates a record. What should it return?",
+          "choices": [
+            "200 with the created user",
+            "201 with the created user and a Location header pointing at it",
+            "204 with no body",
+            "202 with the created user"
+          ],
+          "answer": 1,
+          "explanation": "201 Created is the specific code for 'a new resource now exists', and the `Location` header tells the client where it is. Returning the body saves the client a follow-up GET. 200 works and nobody will die, but 201 communicates more. 204 means 'done, nothing to say' — right for a DELETE. 202 Accepted means you queued it and it hasn't happened yet, which is a different promise entirely.",
+          "followUp": "When would 202 be the honest answer for a create?",
+          "estSeconds": 45
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["middleware"],
+          "prompt": "Which belong in middleware rather than in each route handler? Select all that apply.",
+          "choices": [
+            "Body parsing",
+            "Authentication",
+            "Request logging with a correlation id",
+            "The specific database query for an endpoint",
+            "CORS headers"
+          ],
+          "answer": [0, 1, 2, 4],
+          "explanation": "Middleware is for cross-cutting concerns — anything you'd otherwise copy into every handler. Body parsing, auth, logging, CORS, rate limiting, compression, security headers. The endpoint's actual query is the one thing that *is* specific to that route, and pushing it into middleware makes the handler harder to follow, not easier.",
+          "followUp": "Where would validation sit — middleware or handler?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["responses"],
+          "prompt": "What goes wrong here?",
+          "code": "app.post('/users', async (req, res) => {\n  if (!req.body.email) {\n    res.status(400).json({ error: 'email required' });\n  }\n  const user = await createUser(req.body);\n  res.status(201).json(user);\n});",
+          "language": "js",
+          "answer": "missing return — execution continues, so it tries to send a second response",
+          "explanation": "Sending a response doesn't stop the function. With no email, the 400 goes out, then `createUser` runs with bad data, then the second `res.json` throws `ERR_HTTP_HEADERS_SENT`. Always `return res.status(400)...`, or restructure with an `else`. Some teams ban bare `res.send` in favour of returning a value that a wrapper serialises, precisely to make this impossible.",
+          "followUp": "What's the cleanest structural fix so this can't happen at all?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["validation"],
+          "prompt": "Why validate request bodies even though the frontend already does?",
+          "choices": [
+            "For better error messages",
+            "The client is not a trust boundary — anyone can send any request with curl, bypassing your UI entirely",
+            "It's faster",
+            "TypeScript types already handle it"
+          ],
+          "answer": 1,
+          "explanation": "Client validation is user experience: fast feedback, fewer round trips. Server validation is security and integrity: your API is a public interface regardless of who you *intended* to call it. And TypeScript is erased at runtime — `req.body as CreateUser` is an assertion that checks nothing. A schema parse at the top of the handler both validates and gives you the type, so the two can never disagree.",
+          "followUp": "What status code and body shape do you return for a validation failure?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["architecture", "layering"],
+          "prompt": "How do you structure an Express codebase past a dozen endpoints?",
+          "keywords": [
+            "route|router|controller",
+            "service|business logic|domain",
+            "repository|data access|db layer",
+            "thin|dumb|no logic in controller",
+            "test|testable|unit test",
+            "feature|module|by feature"
+          ],
+          "modelAnswer": "Three layers. Routes/controllers deal with HTTP only: parse and validate input, call something, map the result to a status code. They should be almost boring — no business rules, no SQL. Services hold the actual logic and know nothing about HTTP, so they're callable from a job or a CLI and unit-testable without spinning up a server. Repositories or a data-access layer own the queries, so switching ORM or adding a cache touches one place.\n\nThe payoff is testing. A controller with the logic inline can only be tested through a request; a service is a function you call with arguments.\n\nFor file layout I organise by feature rather than by type — `users/users.routes.ts`, `users/users.service.ts`, `users/users.repo.ts` — because a change to the users feature then touches one folder instead of four. The `controllers/` `services/` `models/` layout works fine at ten endpoints and gets tedious at a hundred.\n\nI wouldn't start there for a five-endpoint service, though. The layers earn their keep when there's logic worth separating; before that they're just indirection.",
+          "explanation": "The signals are: HTTP concerns confined to the edge, logic testable without HTTP, and the judgement to say when the structure isn't worth it yet.",
+          "followUp": "What goes in the service versus the repository when the logic is a single query?",
+          "estSeconds": 210
+        }
+      ]
+    },
+    {
+      "slug": "rest-design",
+      "name": "REST API Design",
+      "level": "working",
+      "summary": "Resources and verbs, status codes that mean something, pagination, idempotency and versioning.",
+      "interviewAngle": "'Design the endpoints for X' is a standard exercise. They're checking whether you model resources or just invent RPC names.",
+      "keyPoints": [
+        "Model nouns, not verbs — /users/123/orders, not /getUserOrders",
+        "GET, PUT and DELETE are idempotent; POST is not",
+        "PUT replaces the whole resource; PATCH applies a partial change",
+        "4xx means the client got it wrong; 5xx means you did",
+        "Paginate every collection endpoint from day one"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["rest", "resources"],
+          "prompt": "Which set of endpoints is most RESTful for managing a user's orders?",
+          "choices": [
+            "POST /createOrder, POST /getOrders, POST /deleteOrder",
+            "GET /users/:id/orders, POST /users/:id/orders, GET /orders/:orderId, DELETE /orders/:orderId",
+            "GET /api?action=orders&user=123",
+            "GET /orders/get/:id, POST /orders/new"
+          ],
+          "answer": 1,
+          "explanation": "REST models resources as nouns and uses the HTTP method as the verb. The nesting shows the relationship for the collection, while an individual order is addressable directly by its own id — nesting everything (`/users/1/orders/9`) makes URLs long and forces the client to know a parent it may not have. Verbs in the path (`/createOrder`) are RPC wearing REST's clothes; sometimes that's the right call, but then say so rather than doing it accidentally.",
+          "followUp": "When would you deliberately choose RPC-style endpoints over REST?",
+          "estSeconds": 60
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["idempotency", "http-methods"],
+          "prompt": "Which HTTP methods are idempotent — calling them twice has the same effect as once? Select all that apply.",
+          "choices": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+          "answer": [0, 2, 4],
+          "explanation": "GET changes nothing. PUT sets the resource to a given state, so repeating it lands on the same state. DELETE removes it; the second call finds nothing to remove — the *effect* is the same even though the status differs (204 then 404). POST creates something new each time, so a retried POST creates duplicates. PATCH is idempotent only if the patch is absolute (`status: 'paid'`) and not if it's relative (`increment: 1`) — the spec doesn't guarantee it.",
+          "followUp": "A payment POST times out and the client retries. How do you stop a double charge?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["status-codes"],
+          "prompt": "A client sends a valid request to create a user, but that email already exists. What status code?",
+          "choices": ["400 Bad Request", "409 Conflict", "422 Unprocessable Entity", "500 Internal Server Error"],
+          "answer": 1,
+          "explanation": "409 Conflict is the specific code for 'the request is well-formed but conflicts with the current state of the server'. 400 says the request itself is malformed, which it isn't — it was fine yesterday. 422 is for semantically invalid content and is a defensible second choice that many APIs use for validation failures. 500 would be claiming your server broke, when it worked exactly as designed. The distinction matters because clients branch on these codes.",
+          "followUp": "How does the client tell a 409 on email apart from a 409 on username?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": ["pagination"],
+          "prompt": "How do you paginate a list endpoint? Compare offset and cursor pagination.",
+          "keywords": [
+            "offset|limit|page|skip",
+            "cursor|keyset|seek|after",
+            "slow|performance|scan|deep",
+            "shift|skip|duplicate|missed|drift",
+            "stable|sort|order|tiebreak",
+            "total|count"
+          ],
+          "modelAnswer": "Offset pagination — `?page=3&limit=20` becoming `LIMIT 20 OFFSET 40` — is simple, lets you jump to any page, and can report a total count. Two problems. Performance: the database still walks and discards the skipped rows, so page 5000 is genuinely slow. And drift: if a row is inserted while the user is paging, everything shifts down and they see an item twice, or miss one entirely.\n\nCursor (keyset) pagination sends an opaque marker for the last row you saw — `?after=<encoded created_at,id>` — and the query becomes `WHERE (created_at, id) < (...) ORDER BY created_at DESC, id DESC LIMIT 20`. It uses the index, so page 5000 costs the same as page 1, and inserts don't shift your window. The cost is that you can't jump to an arbitrary page and total counts are awkward.\n\nSo: offset for an admin table where someone wants page 7 and a row count; cursor for infinite scroll, feeds, syncing, and anything with a lot of rows or a lot of writes.\n\nEither way I'd always include the id as a tiebreaker in the sort, or rows with identical timestamps can appear on two pages. And I'd cap `limit` server-side — otherwise someone asks for a million rows and finds your OOM.",
+          "explanation": "The mid-level markers are the drift problem, the deep-offset performance issue, and remembering to cap the limit and add a sort tiebreaker.",
+          "followUp": "Why does the cursor need to encode both the sort field and the id?",
+          "estSeconds": 240
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["put", "patch"],
+          "prompt": "A client sends `PUT /users/7` with only `{ \"name\": \"Bea\" }`. By the spec, what should happen to the user's email?",
+          "choices": [
+            "It's left unchanged",
+            "It's cleared — PUT replaces the entire resource with what was sent",
+            "The request is rejected",
+            "It depends on the framework"
+          ],
+          "answer": 1,
+          "explanation": "PUT means 'make the resource look exactly like this'. A field you omit is a field you're saying shouldn't be there. That's why partial updates should use PATCH — and why so many APIs claim PUT but implement PATCH semantics, which then surprises anyone who reads the method name and trusts it. Pick the method that matches what you actually do.",
+          "followUp": "Given how often PUT is implemented as a partial update, is the distinction worth defending?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["errors", "api-design"],
+          "prompt": "Design a consistent error body. Fill in the two fields that matter most to a client.",
+          "code": "{\n  \"___\": \"VALIDATION_FAILED\",\n  \"message\": \"Request could not be processed\",\n  \"___\": [\n    { \"field\": \"email\", \"issue\": \"must be a valid email\" }\n  ]\n}",
+          "language": "json",
+          "answer": ["code", "details"],
+          "explanation": "A stable machine-readable `code` is what clients branch on — messages get reworded and translated, so matching on them is fragile. Field-level `details` let a form map errors back onto the right inputs instead of showing one generic banner. Keep the shape identical across every endpoint, including 500s, so client error handling can be written once.",
+          "followUp": "Should the error body ever include a stack trace or the SQL that failed?",
+          "estSeconds": 75
+        },
+        {
+          "type": "multi",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["versioning"],
+          "prompt": "You need a breaking change to a live API. Which are reasonable approaches? Select all that apply.",
+          "choices": [
+            "Version in the URL: /v2/users",
+            "Version by header: Accept: application/vnd.api.v2+json",
+            "Add the new field alongside the old one and deprecate the old on a timeline",
+            "Change it and email the clients",
+            "Ship both shapes behind a feature flag per client"
+          ],
+          "answer": [0, 1, 2, 4],
+          "explanation": "URL versioning is the most common because it's visible and cacheable; header versioning keeps URLs clean but is easier to get wrong in a browser or a curl command. Additive change with a deprecation window is the least disruptive and should be your first instinct — most 'breaking' changes can be made additive with a little thought. Per-client flags work for a small number of known integrators. Just changing it breaks every client that hasn't deployed today.",
+          "followUp": "Which changes are safely additive, and which are always breaking?",
+          "estSeconds": 90
+        },
+        {
+          "type": "order",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["request-lifecycle"],
+          "prompt": "Order what a request handler should do, from first to last.",
+          "choices": [
+            "Authenticate — establish who is calling",
+            "Authorise — check they may do this to this resource",
+            "Validate and parse the input",
+            "Execute the business operation",
+            "Serialise the result to the response shape and status"
+          ],
+          "answer": [0, 1, 2, 3, 4],
+          "explanation": "Identity before permission — you can't check what someone may do before knowing who they are. Authorisation before validation is a deliberate choice: a caller with no rights to the resource shouldn't learn anything from your validation messages, including whether the resource exists. Then validate, then act, then shape the output — and the serialisation step is where you strip fields the caller shouldn't see, like password hashes and internal ids.",
+          "followUp": "Why does returning 404 instead of 403 sometimes matter for security?",
+          "estSeconds": 90
+        }
+      ]
+    },
+    {
+      "slug": "node-data-access",
+      "name": "Databases From the Server",
+      "level": "working",
+      "summary": "Queries, transactions, connection pools, N+1, and where an ORM helps or hurts.",
+      "interviewAngle": "N+1 is the single most-asked backend performance question. Transactions come up whenever money or multi-step writes are involved.",
+      "keyPoints": [
+        "N+1 means one query for the list plus one per row — fix with a join or a batched IN query",
+        "A transaction makes several writes succeed or fail together",
+        "Connection pools are finite; a leaked connection eventually deadlocks the app",
+        "Parameterised queries are the defence against SQL injection — never interpolate strings",
+        "ORMs speed up CRUD and get in the way of complex reads; most codebases need both"
+      ],
+      "items": [
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["n-plus-one", "performance"],
+          "prompt": "What is an N+1 query problem? Give an example and two ways to fix it.",
+          "keywords": [
+            "one query|list|parent",
+            "per row|each|loop|n queries",
+            "join",
+            "in|batch|batched|dataloader",
+            "eager|include|preload|eager load"
+          ],
+          "modelAnswer": "You run one query to fetch a list, then one more query per item to fetch something related — 1 + N queries where 1 or 2 would do. Fetch 50 posts, then loop and fetch each author: 51 round trips. It's invisible in development with 5 rows and takes the site down at 500.\n\nFix one: a join, so the database returns posts with their authors in a single query. That's what an ORM's eager loading — `include`, `with`, `Include()` — generates for you.\n\nFix two: batch. Collect the author ids from the 50 posts and do one `WHERE id IN (...)`, then stitch them together in memory. That's what DataLoader does in GraphQL, and it's often better than a join when the related rows repeat heavily, because a join duplicates the post row for every author row.\n\nThe reason it's so common is that lazy loading makes it invisible — `post.author` looks like a property access and is secretly a query. I'd catch it by logging query counts per request in development, or with an APM tool that shows the count in a trace.",
+          "explanation": "Naming both the join fix and the batched-IN fix, and explaining *why* lazy loading hides it, is the complete answer.",
+          "followUp": "When is the join actually worse than the batched query?",
+          "estSeconds": 210
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["sql-injection", "security"],
+          "prompt": "What's wrong with this, and what's the fix?",
+          "code": "const rows = await db.query(\n  `SELECT * FROM users WHERE email = '${req.body.email}'`\n);",
+          "language": "js",
+          "choices": [
+            "Nothing — the value comes from a trusted form",
+            "SQL injection — use a parameterised query with a placeholder so the driver sends the value separately from the SQL",
+            "Just escape the quotes in the email",
+            "Use double quotes instead"
+          ],
+          "answer": 1,
+          "explanation": "An email of `' OR '1'='1` returns every user; something worse can drop tables. Parameterised queries (`WHERE email = $1` with the value passed separately) mean the database parses the SQL first and treats the parameter purely as data — there is no string for an attacker to escape out of. Hand-rolled escaping fails to edge cases and encodings. Every ORM and query builder does this by default; the danger is the one place someone reaches for raw string concatenation.",
+          "followUp": "Where do ORMs still leave you exposed to injection?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["transactions"],
+          "prompt": "Transferring money between accounts: debit one, credit the other. Why must this be a transaction?",
+          "choices": [
+            "For speed",
+            "So both writes commit together or neither does — a crash between them would otherwise destroy money",
+            "To lock the table",
+            "Transactions aren't needed if both queries succeed"
+          ],
+          "answer": 1,
+          "explanation": "Atomicity: the pair is one logical operation, so a failure after the debit must undo it. Without a transaction, a crash, a network blip or a constraint violation on the second write leaves the system permanently inconsistent — and you'll only find out from an angry customer. The other guarantees matter too: isolation stops a concurrent reader seeing the half-done state, and durability means a committed transfer survives the power going out.",
+          "followUp": "What isolation level would you want here, and what anomaly does the default allow?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["connection-pool"],
+          "prompt": "Under load the app stops responding entirely, with no errors. What's the likely cause?",
+          "code": "async function getUser(id) {\n  const client = await pool.connect();\n  const { rows } = await client.query('SELECT * FROM users WHERE id = $1', [id]);\n  client.release();\n  return rows[0];\n}",
+          "language": "js",
+          "answer": "connection leak — a thrown query never reaches release(), so the pool is exhausted",
+          "explanation": "If `query` throws — bad input, a constraint, a timeout — the function exits before `client.release()`, and that connection is gone for good. After ten failures a ten-connection pool is empty, and every subsequent `pool.connect()` waits forever. The app hangs rather than erroring, which is why it's hard to diagnose. Wrap it in `try/finally` so release always runs, or use the pool's `pool.query()` convenience method, which manages the checkout for you.",
+          "followUp": "How would you size the pool, given the database has a connection limit too?",
+          "estSeconds": 90
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["orm"],
+          "prompt": "Which are genuine tradeoffs of using an ORM? Select all that apply.",
+          "choices": [
+            "Faster to write standard CRUD and migrations",
+            "Type-safe query results in TypeScript",
+            "Complex reporting queries are often clumsier than hand-written SQL",
+            "It generates queries you didn't read, which is how N+1 sneaks in",
+            "It removes the need to understand indexes"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "The first four are real. The last is the trap: an ORM changes who writes the SQL, not whether the database needs an index. A `findMany` with a `where` on an unindexed column is a full table scan no matter how nice the API looks. The healthy position is to use the ORM for the 90% that's CRUD, drop to raw SQL for reports, and read the generated queries in development.",
+          "followUp": "How do you actually see the SQL your ORM is generating?",
+          "estSeconds": 75
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["transactions"],
+          "prompt": "Complete a safe transaction wrapper.",
+          "code": "const client = await pool.connect();\ntry {\n  await client.query('___');\n  await debit(client, from, amount);\n  await credit(client, to, amount);\n  await client.query('___');\n} catch (err) {\n  await client.query('___');\n  throw err;\n} finally {\n  client.___();\n}",
+          "language": "js",
+          "answer": ["BEGIN", "COMMIT", "ROLLBACK", "release"],
+          "explanation": "Both writes must use the *same* client — that's what puts them in one transaction, and it's why the client is threaded through `debit` and `credit` rather than each grabbing its own. Rollback on any error, rethrow so the caller knows, and release in `finally` so the connection returns to the pool on every path.",
+          "followUp": "What happens to the transaction if you forget to pass the client into `credit`?",
+          "estSeconds": 90
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["indexes"],
+          "prompt": "A query filtering on `status` and sorting by `created_at` is slow over a million rows. Best first move?",
+          "choices": [
+            "Add more memory to the database",
+            "Run EXPLAIN to see the plan, then add a composite index on (status, created_at)",
+            "Cache the result in Redis",
+            "Paginate with a smaller page size"
+          ],
+          "answer": 1,
+          "explanation": "Look at the plan before changing anything — `EXPLAIN ANALYZE` tells you whether it's a sequential scan, and where the time goes. A composite index on `(status, created_at)` lets the database find the matching rows *and* return them already ordered, avoiding a sort. Column order matters: equality columns first, then the range or sort column. Caching hides a bad query rather than fixing it, and a smaller page doesn't help when the sort still scans everything.",
+          "followUp": "Why does the order of columns in a composite index matter?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["migrations"],
+          "prompt": "You need to add a NOT NULL column to a large table used by a running app. What's the safe sequence?",
+          "choices": [
+            "Add it as NOT NULL in one migration",
+            "Add it nullable, backfill in batches, then add the constraint once every row has a value",
+            "Drop and recreate the table",
+            "Add it in a transaction with a table lock"
+          ],
+          "answer": 1,
+          "explanation": "Adding a NOT NULL column to a populated table has to give every existing row a value, which on a large table can hold a lock long enough to take the site down. The safe path is three steps across three deploys: add nullable, backfill in batches so each one is short, then enforce the constraint. This is the general shape of every zero-downtime migration — expand, migrate, contract — and the same applies to renaming a column or changing a type.",
+          "followUp": "How would you rename a column with zero downtime?",
+          "estSeconds": 75
+        }
+      ]
+    },
+    {
+      "slug": "auth-and-security",
+      "name": "Auth & Web Security",
+      "level": "professional",
+      "summary": "Sessions vs JWTs, password storage, CORS, and the OWASP issues that come up in every interview.",
+      "interviewAngle": "'Sessions or JWT?' and 'explain CORS' are near-guaranteed. Getting password hashing wrong is an instant no.",
+      "keyPoints": [
+        "Authentication is who you are; authorisation is what you may do",
+        "Hash passwords with bcrypt/argon2 — never encrypt, never MD5/SHA, always salted",
+        "JWTs are stateless and therefore hard to revoke; sessions are revocable but need a store",
+        "CORS is a browser restriction, not a server one — it doesn't protect your API",
+        "Validate and escape all input; parameterise all queries; never trust the client"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["passwords", "hashing"],
+          "prompt": "How should you store user passwords?",
+          "choices": [
+            "Encrypted with AES so you can decrypt them for support",
+            "Hashed with a slow, salted algorithm like bcrypt or argon2",
+            "Hashed with SHA-256",
+            "Hashed with MD5 plus a secret pepper"
+          ],
+          "answer": 1,
+          "explanation": "Encryption is reversible — if you can decrypt them, so can whoever steals your key. SHA-256 and MD5 are *fast*, which is exactly wrong: a GPU tries billions per second against a leaked hash dump. bcrypt and argon2 are deliberately slow and memory-hard, with a tunable cost factor you raise as hardware improves, and they salt each password so identical passwords hash differently and rainbow tables are useless. If anyone can tell a user their existing password, the system is already broken.",
+          "followUp": "What's the salt for, given it's stored right next to the hash?",
+          "estSeconds": 45
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": ["jwt", "sessions"],
+          "prompt": "Sessions or JWTs? Compare them and say which you'd pick for a standard web app.",
+          "keywords": [
+            "stateless|no lookup|self contained",
+            "server|store|database|redis|session store",
+            "revoke|revocation|logout|invalidate",
+            "expiry|short lived|refresh token",
+            "cookie|httponly|localstorage|xss",
+            "scale|microservice|multiple services"
+          ],
+          "modelAnswer": "A session is an opaque id in a cookie; the server looks up the real data in a store. A JWT is a signed token carrying the claims themselves, so the server verifies the signature and needs no lookup.\n\nJWTs win on statelessness — no shared session store, which suits many services verifying tokens independently. The cost is revocation. Once issued, a JWT is valid until it expires; you can't log someone out, and you can't strip a role you just removed. The usual workaround — a revocation blocklist — reintroduces exactly the lookup you were avoiding. The real mitigation is short-lived access tokens plus a refresh token you *can* revoke, which is more moving parts than most apps need.\n\nSessions are trivially revocable: delete the row. The cost is a store, which for a single app is a Redis instance or even a database table — not a real burden.\n\nFor a standard web app with one backend I'd use sessions in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie. Logout works, permission changes take effect immediately, and the token is unreachable from JavaScript so XSS can't steal it. I'd reach for JWTs when there are multiple independent services, third-party API clients, or a mobile app where cookies are awkward.\n\nAnd whichever I pick, the token goes in an HttpOnly cookie rather than localStorage — 'JWT means localStorage' is the mistake that turns any XSS into a full account takeover.",
+          "explanation": "The differentiator is revocation, and the strongest candidates say sessions are the boring correct default for a single web app rather than reflexively picking JWT.",
+          "followUp": "If you use cookies, what do you now have to think about that you didn't with a header token?",
+          "estSeconds": 240
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["cors"],
+          "prompt": "Your fetch fails with a CORS error. What is CORS actually doing?",
+          "choices": [
+            "Blocking the request from reaching your server",
+            "The browser sent the request but refuses to let the calling page read the response, because the server didn't return an allowing Access-Control-Allow-Origin header",
+            "The server rejected the request",
+            "It's a firewall rule"
+          ],
+          "answer": 1,
+          "explanation": "For a simple request the browser sends it — your server runs the handler, the database write happens — and then blocks the *response* from JavaScript because the origin isn't allowed. That's the crucial point: CORS is a browser protection for the user, not a security control for your API. curl, Postman and any server ignore it entirely. So never treat CORS as authorisation; that's what auth checks are for. (For non-simple requests a preflight OPTIONS goes first, and that one really can stop the request.)",
+          "followUp": "What makes a request 'non-simple' and trigger a preflight?",
+          "estSeconds": 75
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["cookies", "security"],
+          "prompt": "Which flags should a session cookie carry? Select all that apply.",
+          "choices": [
+            "HttpOnly — unreadable from JavaScript",
+            "Secure — only sent over HTTPS",
+            "SameSite=Lax or Strict — not sent on most cross-site requests",
+            "Domain=* — available everywhere",
+            "A sensible Max-Age or Expires"
+          ],
+          "answer": [0, 1, 2, 4],
+          "explanation": "`HttpOnly` means an XSS payload can't read the cookie. `Secure` stops it crossing plaintext HTTP. `SameSite` is the main CSRF defence — `Lax` still allows top-level navigation, which keeps normal links working. An expiry bounds how long a stolen cookie is useful. `Domain=*` isn't valid, and widening the domain shares your session with every subdomain, including any less-trusted one.",
+          "followUp": "With SameSite=Lax set, do you still need CSRF tokens?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["authorisation"],
+          "prompt": "`GET /api/orders/:id` checks the user is logged in and returns the order. What's missing?",
+          "choices": [
+            "Rate limiting",
+            "An ownership check — any authenticated user can read any order by guessing ids",
+            "Input validation",
+            "Nothing"
+          ],
+          "answer": 1,
+          "explanation": "This is a broken object-level authorisation bug (IDOR), consistently near the top of the OWASP list. Authentication answered 'who are you'; nothing answered 'may *you* see *this* order'. The fix is to scope the query — `WHERE id = ? AND user_id = ?` — rather than fetching and then comparing, so the check can't be forgotten. Return 404 rather than 403 so an attacker can't enumerate which ids exist.",
+          "followUp": "Where would you put this check so it can't be forgotten on the next endpoint?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["bcrypt"],
+          "prompt": "Complete registration and login.",
+          "code": "// register\nconst hash = await bcrypt.___(password, 12);\n\n// login\nconst ok = await bcrypt.___(attempt, user.passwordHash);",
+          "language": "js",
+          "answer": ["hash", "compare"],
+          "explanation": "`hash` generates a salt and embeds it in the output string, so you store one value. `compare` extracts that salt, rehashes the attempt and compares in constant time — never compare with `===`, which leaks information through timing. The `12` is the cost factor: each increment doubles the work. Pick the highest value your login latency budget tolerates, around 100ms, and revisit it as hardware gets faster.",
+          "followUp": "Why must the comparison be constant-time?",
+          "estSeconds": 60
+        },
+        {
+          "type": "multi",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["owasp"],
+          "prompt": "Which are real, common web vulnerabilities you should be able to name? Select all that apply.",
+          "choices": [
+            "SQL injection — unparameterised queries",
+            "XSS — rendering untrusted content as HTML or script",
+            "CSRF — a third-party site making authenticated requests using your cookies",
+            "Broken access control — missing ownership or role checks",
+            "Sending JSON instead of XML"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "Those four cover most of what actually happens. Broken access control has been the number one item on the OWASP Top 10 recently — it's not exotic, it's a forgotten `WHERE user_id = ?`. Worth also knowing: security misconfiguration (debug mode in production, default credentials), vulnerable dependencies, and leaking sensitive data in logs or error responses.",
+          "followUp": "React escapes content by default — so how do XSS bugs still happen in React apps?",
+          "estSeconds": 90
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["timing", "enumeration"],
+          "prompt": "What does this leak?",
+          "code": "const user = await findByEmail(email);\nif (!user) return res.status(404).json({ error: 'No such user' });\n\nconst ok = await bcrypt.compare(password, user.passwordHash);\nif (!ok) return res.status(401).json({ error: 'Wrong password' });",
+          "language": "js",
+          "answer": "user enumeration — different responses reveal which emails are registered",
+          "explanation": "The distinct status codes and messages let anyone check whether an address has an account — useful for targeted phishing, and a privacy problem for sites where membership is sensitive. Timing leaks it too: the no-user path skips the deliberately-slow bcrypt call and returns much faster. Return the same 401 and message for both, and hash against a dummy value when the user doesn't exist so the timing matches.",
+          "followUp": "Doesn't the signup form leak this anyway when it says 'email already taken'?",
+          "estSeconds": 90
+        }
+      ]
+    }
+  ]
+}

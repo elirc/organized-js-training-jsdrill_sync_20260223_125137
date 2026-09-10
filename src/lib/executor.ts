@@ -1,121 +1,82 @@
-import type { TestCase, TestResult, ExecutionResult } from "@/types";
-import { deepEqual } from "./utils";
+import type { ExecutionResult, TestCase } from "@/types";
 
-function extractFunctionName(code: string): string | null {
-  const match = code.match(/function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/);
-  return match ? match[1] : null;
+const TIMEOUT_MS = 3000;
+
+/**
+ * Run learner code against test cases in a worker.
+ *
+ * The worker is spawned per run and terminated afterwards: it's the only way
+ * to interrupt a runaway loop, and it also guarantees each run starts from a
+ * clean global scope so a previous attempt can't leak state into this one.
+ */
+export function runCode(
+  code: string,
+  testCases: TestCase[],
+  entryPoint?: string
+): Promise<ExecutionResult> {
+  return new Promise((resolve) => {
+    let worker: Worker;
+    try {
+      worker = new Worker("/sandbox.js");
+    } catch {
+      resolve(failAll(testCases, "Could not start the code sandbox.", "sandbox-unavailable"));
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      worker.terminate();
+      resolve(
+        failAll(
+          testCases,
+          `Timed out after ${TIMEOUT_MS / 1000}s — check for an infinite loop.`,
+          "timeout"
+        )
+      );
+    }, TIMEOUT_MS);
+
+    worker.onmessage = (event: MessageEvent<ExecutionResult>) => {
+      clearTimeout(timer);
+      worker.terminate();
+      resolve(event.data);
+    };
+
+    worker.onerror = (event) => {
+      clearTimeout(timer);
+      worker.terminate();
+      resolve(failAll(testCases, event.message || "The sandbox crashed.", "runtime-error"));
+    };
+
+    worker.postMessage({ code, testCases, entryPoint });
+  });
 }
 
-export function executeUserCode(
-  userCode: string,
-  testCases: TestCase[]
-): ExecutionResult {
-  const fnName = extractFunctionName(userCode);
-  if (!fnName) {
-    return {
-      allPassed: false,
-      results: testCases.map((tc) => ({
-        passed: false,
-        error: "Could not find a function declaration in your code.",
-        testCase: tc,
-      })),
-      errorType: "syntax-error",
-    };
-  }
-
-  const results: TestResult[] = testCases.map((tc) => {
-    try {
-      // Create the function in a sandboxed scope
-      const fn = new Function(
-        `${userCode};\nreturn ${fnName}(...arguments);`
-      );
-
-      const startTime = performance.now();
-      const result = fn(...tc.input);
-      const elapsed = performance.now() - startTime;
-
-      if (elapsed > 5000) {
-        return { passed: false, error: "Timeout (>5s)", testCase: tc };
-      }
-
-      // Handle undefined vs null: if expected is null and result is undefined, that's a match
-      const passed = deepEqual(result, tc.expected) ||
-        (tc.expected === null && result === undefined) ||
-        (tc.expected === undefined && result === null);
-
-      return {
-        passed,
-        result,
-        expected: tc.expected,
-        testCase: tc,
-      };
-    } catch (e) {
-      return {
-        passed: false,
-        error: e instanceof Error ? e.message : String(e),
-        testCase: tc,
-      };
-    }
-  });
-
+function failAll(testCases: TestCase[], error: string, errorType: string): ExecutionResult {
   return {
-    allPassed: results.every((r) => r.passed),
-    results,
-    errorType: classifyError(results),
+    allPassed: false,
+    logs: [],
+    errorType,
+    results: testCases.map((testCase) => ({ passed: false, error, testCase })),
   };
 }
 
-function classifyError(results: TestResult[]): string | null {
-  if (results.every((r) => r.passed)) return null;
-
-  const failures = results.filter((r) => !r.passed);
-
-  // Syntax/runtime error
-  if (failures.some((r) => r.error && r.error !== "Timeout (>5s)")) {
-    return "runtime-error";
+/** Human-readable hint for each error classification. */
+export function errorHint(errorType: string | null): string | null {
+  switch (errorType) {
+    case "no-function":
+      return "Your code needs a named function — the tests call it by name.";
+    case "syntax-error":
+      return "The code didn't parse. Check brackets, commas and quotes.";
+    case "timeout":
+      return "Something never finished. A loop condition probably never becomes false.";
+    case "edge-case-miss":
+      return "The main cases work — you're missing an edge case. Empty input? Nulls? One element?";
+    case "logic-error":
+      return "Nothing passed, so the core approach is off rather than a small slip.";
+    case "partial-failure":
+      return "Some cases pass and some don't. Find what's different about the failing ones.";
+    case "runtime-error":
+      return "It threw. Read the error message — it usually names the exact value that was wrong.";
+    default:
+      return null;
   }
-
-  // Timeout
-  if (failures.some((r) => r.error === "Timeout (>5s)")) {
-    return "timeout";
-  }
-
-  // Edge case miss: passed most but failed on edge cases
-  if (
-    failures.length <= 2 &&
-    failures.every((r) => r.testCase.isEdgeCase)
-  ) {
-    return "edge-case-miss";
-  }
-
-  // Type mismatch
-  if (
-    failures.some(
-      (r) =>
-        r.result !== undefined &&
-        r.expected !== undefined &&
-        typeof r.result !== typeof r.expected
-    )
-  ) {
-    return "type-mismatch";
-  }
-
-  // Off-by-one: numeric results within 1 of expected
-  if (
-    failures.some(
-      (r) =>
-        typeof r.result === "number" &&
-        typeof r.expected === "number" &&
-        Math.abs(r.result - r.expected) === 1
-    )
-  ) {
-    return "off-by-one";
-  }
-
-  // Total failure
-  if (failures.length === results.length) {
-    return "logic-error";
-  }
-
-  return "partial-failure";
 }

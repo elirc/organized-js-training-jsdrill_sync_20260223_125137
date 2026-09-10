@@ -1,94 +1,100 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { EditorState } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from "@codemirror/view";
+import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
+import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentUnit } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 
-type CodeEditorProps = {
-  initialCode: string;
+type Props = {
+  value: string;
   onChange: (code: string) => void;
+  /** Fires on Cmd/Ctrl+Enter — the run shortcut. */
+  onRun?: () => void;
   readOnly?: boolean;
 };
 
-export function CodeEditor({ initialCode, onChange, readOnly = false }: CodeEditorProps) {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
+/**
+ * CodeMirror wrapper.
+ *
+ * The editor is created once per mount and never rebuilt from `value`: doing
+ * that on every keystroke would destroy the cursor position. The runner
+ * remounts it with a `key` when the item changes, which is the clean way to
+ * reset it.
+ */
+export function CodeEditor({ value, onChange, onRun, readOnly = false }: Props) {
+  const host = useRef<HTMLDivElement>(null);
+  const view = useRef<EditorView | null>(null);
 
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  // Keep the latest callbacks reachable without re-creating the editor.
+  const handlers = useRef({ onChange, onRun });
+  handlers.current = { onChange, onRun };
 
-  const createEditor = useCallback(() => {
-    if (!editorRef.current) return;
+  useEffect(() => {
+    if (!host.current) return;
 
-    // Clean up existing editor
-    if (viewRef.current) {
-      viewRef.current.destroy();
-    }
+    const isDark = document.documentElement.classList.contains("dark");
 
     const state = EditorState.create({
-      doc: initialCode,
+      doc: value,
       extensions: [
         lineNumbers(),
         highlightActiveLine(),
-        highlightActiveLineGutter(),
         history(),
         bracketMatching(),
         closeBrackets(),
         javascript(),
-        oneDark,
-        syntaxHighlighting(defaultHighlightStyle),
+        indentUnit.of("  "),
         keymap.of([
+          {
+            key: "Mod-Enter",
+            preventDefault: true,
+            run: () => {
+              handlers.current.onRun?.();
+              return true;
+            },
+          },
+          ...closeBracketsKeymap,
           ...defaultKeymap,
           ...historyKeymap,
-          ...closeBracketsKeymap,
           indentWithTab,
         ]),
+        ...(isDark ? [oneDark] : [syntaxHighlighting(defaultHighlightStyle)]),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
-            onChangeRef.current(update.state.doc.toString());
-          }
+          if (update.docChanged) handlers.current.onChange(update.state.doc.toString());
         }),
         EditorView.theme({
-          "&": {
-            fontSize: "14px",
-            height: "100%",
+          "&": { fontSize: "13px", backgroundColor: isDark ? "#0d131f" : "#ffffff" },
+          ".cm-content": { minHeight: "180px", padding: "10px 0" },
+          ".cm-gutters": {
+            backgroundColor: "transparent",
+            border: "none",
+            opacity: "0.5",
           },
-          ".cm-scroller": {
-            fontFamily: "var(--font-geist-mono), 'Fira Code', 'Consolas', monospace",
-          },
-          ".cm-content": {
-            minHeight: "200px",
-          },
+          ".cm-activeLine": { backgroundColor: isDark ? "#ffffff08" : "#0f172a06" },
+          ".cm-activeLineGutter": { backgroundColor: "transparent" },
         }),
-        ...(readOnly ? [EditorState.readOnly.of(true)] : []),
+        EditorState.readOnly.of(readOnly),
       ],
     });
 
-    viewRef.current = new EditorView({
-      state,
-      parent: editorRef.current,
-    });
-  }, [initialCode, readOnly]);
+    view.current = new EditorView({ state, parent: host.current });
 
-  useEffect(() => {
-    createEditor();
     return () => {
-      if (viewRef.current) {
-        viewRef.current.destroy();
-        viewRef.current = null;
-      }
+      view.current?.destroy();
+      view.current = null;
     };
-  }, [createEditor]);
+    // `value` is the initial document only — see the note above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly]);
 
   return (
     <div
-      ref={editorRef}
-      className="rounded-lg overflow-hidden border border-gray-700 min-h-[200px]"
+      ref={host}
+      className="rounded-lg border hairline overflow-hidden min-h-[180px] bg-[var(--surface-muted)]"
     />
   );
 }

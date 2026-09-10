@@ -1,0 +1,751 @@
+{
+  "track": {
+    "id": "trk-fundamentals",
+    "slug": "fundamentals",
+    "name": "Web Fundamentals",
+    "tagline": "The stack-agnostic knowledge every interview assumes you have",
+    "description": "HTTP and the browser, SQL that doesn't fall over, git workflows, testing strategy, and the application-architecture questions that come up whichever language you're hired for.",
+    "icon": "◇",
+    "accent": "slate",
+    "sortOrder": 7
+  },
+  "modules": [
+    {
+      "slug": "http-and-web",
+      "name": "HTTP & How the Web Works",
+      "level": "foundation",
+      "summary": "Methods, status codes, headers, cookies, caching and what happens between typing a URL and seeing a page.",
+      "interviewAngle": "'What happens when you type a URL and press enter?' is the most-asked question in the industry. Status codes come up constantly.",
+      "keyPoints": [
+        "2xx success, 3xx redirect, 4xx client error, 5xx server error",
+        "HTTP is stateless — cookies and tokens are how state is simulated",
+        "Headers carry content type, auth, caching and CORS information",
+        "HTTPS gives encryption, integrity and server identity via TLS",
+        "Caching is controlled by Cache-Control, ETag and Last-Modified"
+      ],
+      "items": [
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["http", "dns", "browser"],
+          "prompt": "What happens between typing a URL and seeing the page?",
+          "keywords": [
+            "dns|resolve|domain name",
+            "tcp|connection|handshake",
+            "tls|https|certificate",
+            "request|http request|get",
+            "html|parse|render|dom",
+            "css|javascript|assets|resources"
+          ],
+          "modelAnswer": "The browser resolves the hostname to an IP — cache, then OS, then a DNS resolver walking the hierarchy. Then it opens a TCP connection to that address on port 443, and for HTTPS does a TLS handshake: the server presents a certificate, the browser validates the chain, and they agree on session keys.\n\nThe browser sends an HTTP GET with headers — host, cookies, accept types, user agent. Something at the other end may be a load balancer or CDN rather than the origin, and it routes to a server that runs the application and returns a status, headers and a body.\n\nThe browser parses the HTML into a DOM, and as it goes it discovers stylesheets, scripts and images and requests those too. CSS blocks rendering because you can't paint without knowing styles; a classic `<script>` blocks parsing unless it's marked `defer` or `async`. Once it has the DOM and CSSOM it builds a render tree, does layout, and paints.\n\nThen JavaScript runs, and in a single-page app that's often when the real content arrives — the initial HTML is a shell and the framework fetches the data and renders. Which is exactly the tradeoff server-side rendering addresses.\n\nDepending on how deep they want to go you can add caching at every layer, HTTP/2 multiplexing, or connection reuse.",
+          "explanation": "There's no single right depth — the skill is telling a coherent story from DNS to paint and knowing which layer to expand when they push.",
+          "followUp": "Where would a CDN sit in that, and what does it change?",
+          "estSeconds": 300
+        },
+        {
+          "type": "multi",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["status-codes"],
+          "prompt": "Match the status code to the situation. Which are correct? Select all that apply.",
+          "choices": [
+            "301 — permanently moved, update your links",
+            "401 — not authenticated",
+            "403 — authenticated but not permitted",
+            "404 — resource not found",
+            "500 — the client sent something invalid"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "500 means *your server* failed — an unhandled exception, a broken dependency. Invalid client input is 400. Getting this backwards matters operationally: alerting is usually built on 5xx rates, so returning 500 for bad input means your dashboards scream about a working system, and real failures get lost in the noise. Also worth knowing 302 (temporary), 304 (not modified), 409 (conflict), 422 (unprocessable) and 429 (rate limited).",
+          "followUp": "Why does the 301 vs 302 distinction matter so much for SEO and browsers?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["stateless", "cookies"],
+          "prompt": "HTTP is stateless. What does that mean, and how do logged-in sessions work?",
+          "choices": [
+            "The server can't store data at all",
+            "Each request is independent with no memory of previous ones — state is carried by the client in cookies or tokens the server validates each time",
+            "Requests must be sent in order",
+            "It means there's no database"
+          ],
+          "answer": 1,
+          "explanation": "The protocol carries no notion of a conversation: two requests from the same browser are unrelated as far as HTTP is concerned. Logins work by the server returning something the browser stores and re-sends — a cookie holding a session id or a token — which the server validates on every single request. That's why 'am I logged in?' is a per-request question, and why an expired token logs you out on your next click rather than at the moment it expires.",
+          "followUp": "What are the tradeoffs of storing session state on the server vs in the token?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["caching"],
+          "prompt": "What does an `ETag` header do?",
+          "choices": [
+            "Encrypts the response",
+            "Identifies a version of the resource — the client re-sends it as `If-None-Match`, and the server replies 304 with no body if it hasn't changed",
+            "Sets the expiry time",
+            "Compresses the response"
+          ],
+          "answer": 1,
+          "explanation": "It's a validation token — usually a hash of the content. The client caches the response with its ETag; next time it asks 'give me this unless it's still version abc123'. If unchanged, the server returns a bodyless 304 and the client uses its copy, saving the bandwidth but not the round trip. `Cache-Control: max-age` avoids the request entirely for a period, so the two are complementary: max-age for freshness, ETag for revalidation after it lapses.",
+          "followUp": "How do you cache aggressively and still ship an update immediately?",
+          "estSeconds": 75
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["headers"],
+          "prompt": "Name the headers.",
+          "code": "POST /api/orders HTTP/1.1\n____________: application/json      # what I'm sending\n____________: Bearer eyJhbGciOi...  # who I am\n____________: application/json      # what I want back",
+          "language": "http",
+          "answer": ["Content-Type", "Authorization", "Accept"],
+          "explanation": "`Content-Type` describes the body you're sending; `Accept` says what you'd like in return; `Authorization` carries credentials, conventionally `Bearer <token>` or `Basic <base64>`. Mixing up Content-Type and Accept is a common source of 415 Unsupported Media Type and 406 Not Acceptable responses, and forgetting Content-Type on a POST is why a body sometimes arrives empty.",
+          "followUp": "What happens if you POST JSON without a Content-Type header?",
+          "estSeconds": 75
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["https", "tls"],
+          "prompt": "Name the three guarantees HTTPS provides over HTTP.",
+          "code": "",
+          "language": "text",
+          "answer": "encryption, integrity, authentication",
+          "explanation": "Encryption: nobody on the path can read the traffic. Integrity: nobody can modify it undetected — which is what stops an ISP or a coffee-shop router injecting ads or scripts. Authentication: the certificate proves you're talking to the domain you asked for, not an impostor. That third one is what people forget, and it's the reason a self-signed certificate warning matters: the traffic is still encrypted, you just can't tell who you're encrypting it *to*.",
+          "followUp": "So is an encrypted connection to an attacker's server any use?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["rest", "graphql"],
+          "prompt": "What problem does GraphQL solve that REST has?",
+          "choices": [
+            "It's faster",
+            "Over- and under-fetching — the client asks for exactly the fields it needs in one request, instead of taking a fixed shape or making several calls",
+            "It doesn't need a server",
+            "It's more secure"
+          ],
+          "answer": 1,
+          "explanation": "A REST endpoint returns a fixed shape, so a mobile client that needs two fields still downloads twenty, and a screen needing data from three resources makes three round trips. GraphQL lets the client specify the shape. The costs are real though: caching is harder (one URL, POST bodies), you can't lean on HTTP status codes the same way, and an unbounded query is a denial-of-service vector unless you add depth and complexity limits. For a straightforward CRUD app REST is usually the simpler answer.",
+          "followUp": "What's the N+1 problem in GraphQL, and how does DataLoader address it?",
+          "estSeconds": 75
+        },
+        {
+          "type": "order",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["cors", "preflight"],
+          "prompt": "Order what happens when a browser makes a cross-origin POST with a JSON body.",
+          "choices": [
+            "The browser sends an OPTIONS preflight with Access-Control-Request-Method and -Headers",
+            "The server responds with Access-Control-Allow-Origin, -Methods and -Headers",
+            "The browser checks the response allows this origin, method and headers",
+            "The actual POST is sent",
+            "The browser lets the page read the response"
+          ],
+          "answer": [0, 1, 2, 3, 4],
+          "explanation": "A JSON POST isn't a 'simple request' — `Content-Type: application/json` triggers a preflight — so the browser asks permission before sending anything. If the preflight response doesn't allow the origin, method and headers, the real request never leaves. That's the case where CORS genuinely prevents the call, unlike a simple GET where the request goes through and only the response is withheld.",
+          "followUp": "Which requests skip the preflight, and why does that distinction exist at all?",
+          "estSeconds": 90
+        }
+      ]
+    },
+    {
+      "slug": "sql-essentials",
+      "name": "SQL Essentials",
+      "level": "foundation",
+      "summary": "Joins, grouping, indexes and normalisation — enough to pass the SQL round and write a sane query.",
+      "interviewAngle": "Almost every backend interview has a live SQL question. INNER vs LEFT JOIN and 'why is this slow' are the two staples.",
+      "keyPoints": [
+        "INNER JOIN keeps matches; LEFT JOIN keeps every left row, NULL-filling the right",
+        "WHERE filters rows before grouping; HAVING filters groups after",
+        "An index makes reads fast and writes slightly slower — index what you filter and sort on",
+        "Normalise to remove duplication, denormalise deliberately for read performance",
+        "Use EXPLAIN before guessing at why a query is slow"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["joins"],
+          "prompt": "You want every customer, with their order count — including customers with no orders. Which join?",
+          "choices": [
+            "INNER JOIN orders",
+            "LEFT JOIN orders",
+            "RIGHT JOIN orders",
+            "CROSS JOIN orders"
+          ],
+          "answer": 1,
+          "explanation": "INNER JOIN drops any customer with no matching order — which is exactly the group you're trying to show. LEFT JOIN keeps every row from the left table and fills the right with NULLs. The follow-up trap: use `COUNT(o.id)` rather than `COUNT(*)`, because `COUNT(*)` counts the NULL-filled row and reports 1 instead of 0.",
+          "followUp": "Why does COUNT(*) give 1 for a customer with no orders?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["group-by", "having"],
+          "prompt": "Find customers who placed more than 5 orders in 2025.",
+          "code": "SELECT c.name, COUNT(o.id) AS order_count\nFROM customers c\nJOIN orders o ON o.customer_id = c.id\n___ o.created_at >= '2025-01-01'\nGROUP BY c.id, c.name\n___ COUNT(o.id) > 5\nORDER BY order_count DESC;",
+          "language": "sql",
+          "answer": ["WHERE", "HAVING"],
+          "explanation": "`WHERE` filters individual rows before grouping — it's the right place for the date, and doing it there means fewer rows to group. `HAVING` filters the groups after aggregation, which is the only place an aggregate like `COUNT` can be tested. Trying to put `COUNT(o.id) > 5` in the WHERE clause is an error, and it's the mistake this question is really testing.",
+          "followUp": "Would moving the date filter into HAVING give the same result?",
+          "estSeconds": 90
+        },
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["indexes"],
+          "prompt": "What does an index do, and what does it cost?",
+          "keywords": [
+            "b-tree|tree|sorted|lookup structure",
+            "scan|full table scan|every row",
+            "faster read|speed up|query",
+            "write|insert|update|slower|maintain",
+            "storage|space|disk",
+            "selective|cardinality|which columns"
+          ],
+          "modelAnswer": "An index is a separate sorted structure — usually a B-tree — mapping column values to row locations. Without one, finding rows matching a condition means scanning every row; with one, the database can binary-search to the matches. On a million rows that's the difference between a second and a millisecond.\n\nThe costs. Every insert, update and delete has to maintain every affected index, so a table with eight indexes writes noticeably slower. They take storage, sometimes comparable to the table. And they're only useful when the query can use them — a function applied to the column (`WHERE LOWER(email) = ...`), a leading wildcard `LIKE '%foo'`, or a type mismatch all defeat the index.\n\nSo: index the columns you filter, join and sort on. Composite indexes need the right column order — equality columns first, then the range or sort column — because a `(a, b)` index helps a query filtering on `a` but not one filtering only on `b`. Low-cardinality columns like a boolean flag rarely justify one, since the index doesn't narrow much.\n\nAnd I'd verify rather than assume: `EXPLAIN ANALYZE` tells you whether the planner actually chose the index. Adding indexes speculatively is how tables end up with fifteen of them and slow writes.",
+          "explanation": "Read speed vs write cost is the baseline. The mid-level markers are what defeats an index and why composite column order matters.",
+          "followUp": "What's a covering index, and why is it so much faster?",
+          "estSeconds": 210
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["null"],
+          "prompt": "The table has 100 rows; 10 have `status = NULL`. How many rows does this return?",
+          "code": "SELECT COUNT(*) FROM tasks WHERE status != 'done';",
+          "language": "sql",
+          "answer": "it excludes the 10 NULL rows",
+          "explanation": "NULL means unknown, so `NULL != 'done'` evaluates to NULL, not TRUE — and WHERE only keeps rows that are TRUE. The ten unknown-status rows silently vanish from a query that reads like it should include them. To include them you need `WHERE status != 'done' OR status IS NULL`, or `WHERE COALESCE(status, '') != 'done'`. This three-valued logic is behind a large share of 'the numbers don't add up' reports.",
+          "followUp": "What does `NULL = NULL` evaluate to, and what does that mean for joins?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["normalisation"],
+          "prompt": "What's the point of normalisation, and when would you denormalise?",
+          "choices": [
+            "Normalisation saves disk space; never denormalise",
+            "Normalisation removes duplication so a fact lives in one place and can't become inconsistent; you denormalise deliberately when read performance demands it and you accept the sync cost",
+            "Normalisation is for reads, denormalisation for writes",
+            "They're the same thing"
+          ],
+          "answer": 1,
+          "explanation": "The real benefit is integrity, not space: if a customer's address exists in one row, it can't disagree with itself. Denormalising — a cached `order_count` on the customer, a duplicated product name on the order line — trades that for fewer joins on a hot read path. The order-line case is interesting because it's not really duplication: you want the price *as it was* at purchase time, not the current one. Denormalise on purpose, with a plan for keeping it in sync.",
+          "followUp": "How would you keep a denormalised counter accurate?",
+          "estSeconds": 75
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["transactions", "acid"],
+          "prompt": "Which describe ACID properties correctly? Select all that apply.",
+          "choices": [
+            "Atomicity — all of the transaction's changes apply, or none do",
+            "Consistency — the database moves from one valid state to another, respecting constraints",
+            "Isolation — concurrent transactions don't see each other's uncommitted work",
+            "Durability — once committed, it survives a crash",
+            "Availability — the database is always reachable"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "Availability is from CAP, a different framework about distributed systems. The one worth understanding properly is isolation, because it's a spectrum, not a boolean: read committed (most defaults) still allows non-repeatable reads and phantoms, so two reads in one transaction can disagree. If you're doing read-then-write logic, that's the gap where a lost update lives, and you need a stronger level or explicit locking.",
+          "followUp": "What's a lost update, and how would you prevent one?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["performance"],
+          "prompt": "A query that ran in 20ms now takes 8 seconds. Nothing in the code changed. Most likely cause?",
+          "choices": [
+            "The database is broken",
+            "Data volume grew past the point where the plan changed — or an index is missing, stale statistics chose a bad plan, or lock contention",
+            "The network is slow",
+            "The query needs rewriting in raw SQL"
+          ],
+          "answer": 1,
+          "explanation": "Queries degrade as data grows: a plan that was fine at 10,000 rows can flip to a sequential scan or a nested loop at ten million. `EXPLAIN ANALYZE` and a comparison with the plan you expected is the first move. Stale statistics are a common culprit after a bulk load — the planner estimates badly and picks the wrong join strategy. Lock contention presents differently: the query is fine in isolation and slow under load.",
+          "followUp": "How would you tell contention apart from a bad plan?",
+          "estSeconds": 75
+        },
+        {
+          "type": "fill",
+          "difficulty": 3,
+          "frequency": 1,
+          "tags": ["window-functions"],
+          "prompt": "Rank each employee's salary within their department, highest first.",
+          "code": "SELECT name, department, salary,\n       ___() ___ (PARTITION BY department ORDER BY salary DESC) AS rank\nFROM employees;",
+          "language": "sql",
+          "answer": ["RANK", "OVER"],
+          "explanation": "Window functions compute across a set of rows without collapsing them the way GROUP BY does — you keep every employee row *and* get the ranking. `PARTITION BY` restarts the numbering per department; `ORDER BY` decides the ranking order. `ROW_NUMBER` never ties, `RANK` leaves gaps after a tie, `DENSE_RANK` doesn't. This is the standard 'top N per group' tool and a favourite intermediate SQL question.",
+          "followUp": "How would you return only the top 3 earners per department?",
+          "estSeconds": 90
+        }
+      ]
+    },
+    {
+      "slug": "git-and-tooling",
+      "name": "Git & Team Workflow",
+      "level": "foundation",
+      "summary": "Branching, merge vs rebase, resolving conflicts, and undoing things without losing work.",
+      "interviewAngle": "'Merge or rebase?' and 'how do you undo a bad commit?' are common, and they reveal whether you've worked on a team.",
+      "keyPoints": [
+        "A commit is a snapshot with a parent — branches are just pointers to commits",
+        "Merge preserves history and adds a commit; rebase rewrites it into a straight line",
+        "Never rebase or force-push a branch other people have pulled",
+        "`revert` undoes safely on shared branches; `reset` rewrites and is for local work",
+        "Pull requests are for review — small ones get reviewed properly, large ones get rubber-stamped"
+      ],
+      "items": [
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["merge", "rebase"],
+          "prompt": "Merge or rebase? When do you use each?",
+          "keywords": [
+            "merge commit|preserves|history",
+            "rebase|replay|rewrite|linear|straight",
+            "shared|public|pushed|others|never rebase",
+            "clean|readable|linear history",
+            "conflict|conflicts"
+          ],
+          "modelAnswer": "Merge takes two branches and creates a commit with both as parents. History is preserved exactly as it happened, including the fact that work was parallel. Rebase replays your commits on top of the new base, producing new commits with new hashes and a linear history.\n\nMy rule: rebase my own local feature branch onto main to keep it current, so my eventual PR is a clean set of commits and reviewers see one coherent story. Merge when integrating into a shared branch, or when the branch has been pushed and others may have it.\n\nThe hard rule is never rebase anything other people have pulled. Rebasing rewrites hashes, so their history and yours diverge, and their next pull either creates duplicate commits or a mess they have to untangle. Same reason force-push to main is disabled everywhere sensible.\n\nOne practical note: rebasing a long-lived branch can mean resolving the same conflict on commit after commit, where a merge resolves it once. `--rerere` helps, but if it's painful that's usually a sign the branch has lived too long.\n\nTeams differ, and I'd follow the local convention — squash-merge PRs is very common and gets you a clean main without anyone needing to rebase carefully.",
+          "explanation": "The non-negotiable is 'never rebase shared history' and the reason why. Adapting to team convention rather than evangelising is a good sign.",
+          "followUp": "What does squash-merging give up, and when would you regret it?",
+          "estSeconds": 210
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["undo"],
+          "prompt": "You pushed a broken commit to a shared main branch. What's the safe fix?",
+          "choices": [
+            "git reset --hard HEAD~1 then force push",
+            "git revert <sha> — creates a new commit undoing the change, leaving history intact",
+            "Delete and recreate the branch",
+            "git commit --amend then force push"
+          ],
+          "answer": 1,
+          "explanation": "`revert` is additive: it makes a new commit that applies the inverse, so everyone else's history stays valid and a plain pull is enough. Reset and amend rewrite history, and force-pushing a shared branch breaks it for everyone who has already pulled — and can silently discard a colleague's commit that landed in the meantime. Reset is the right tool for your own unpushed work.",
+          "followUp": "How would you undo a revert if it turns out the commit was fine?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["stash", "workflow"],
+          "prompt": "You're mid-change and need to switch branches urgently for a hotfix. Cleanest option?",
+          "choices": [
+            "Commit everything with a 'wip' message",
+            "`git stash` (or `git stash -u` to include new files), switch, fix, come back and `git stash pop`",
+            "Copy the files elsewhere",
+            "Discard the changes"
+          ],
+          "answer": 1,
+          "explanation": "Stash puts your working tree changes aside and gives you a clean checkout. `-u` includes untracked files, which is the part people forget — a new file left behind can silently follow you onto the hotfix branch. A WIP commit is also fine and arguably safer, since stashes are easy to forget about; if you do that, remember to amend or drop it before the PR.",
+          "followUp": "What's the risk of leaving stashes around for weeks?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 1,
+          "frequency": 2,
+          "tags": ["basics"],
+          "prompt": "Name the commands.",
+          "code": "git ___          # see what's staged and modified\ngit ___ -b feat/x  # create and switch to a branch\ngit ___ origin main  # fetch and integrate remote changes\ngit ___ --oneline  # compact commit history",
+          "language": "bash",
+          "answer": ["status", "checkout|switch", "pull", "log"],
+          "explanation": "`git switch -b` is the modern spelling of `checkout -b` — `checkout` was overloaded to do both branch switching and file restoring, which is why `switch` and `restore` were split out. `git pull` is `fetch` plus `merge`; `pull --rebase` replays your local commits on top instead, which many teams prefer to avoid merge commits from routine syncs.",
+          "followUp": "What's the difference between `git fetch` and `git pull`?",
+          "estSeconds": 60
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["code-review"],
+          "prompt": "What makes a pull request easy to review? Select all that apply.",
+          "choices": [
+            "It's small and does one thing",
+            "The description says what changed and why",
+            "Formatting changes are in a separate commit or PR",
+            "It includes tests for the behaviour it changes",
+            "It touches 40 files so reviewers see the full context"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "Review quality drops sharply with size — past a few hundred lines people stop finding bugs and start commenting on naming. Mixing a reformat with a logic change is the worst offender, because the real change is invisible in the diff. The 'why' matters more than the 'what': the diff already shows what changed, but only the author knows what problem it solves and what alternatives were rejected.",
+          "followUp": "How would you split a genuinely large feature into reviewable PRs?",
+          "estSeconds": 75
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["conflicts"],
+          "prompt": "What do these markers mean, and what do you do?",
+          "code": "<<<<<<< HEAD\nconst timeout = 5000;\n=======\nconst timeout = 30000;\n>>>>>>> feat/slow-api",
+          "language": "text",
+          "answer": "a merge conflict — HEAD is your branch, below is the incoming; pick or combine, delete the markers, then stage",
+          "explanation": "Git couldn't decide because both sides changed the same lines. Above `=======` is the version on the branch you're on; below is what's being merged in. You edit to the correct final state — which may be either, or neither — delete all three marker lines, then `git add` to mark it resolved. The classic failure is committing the markers, which is why a linter or a CI grep for `<<<<<<<` earns its keep.",
+          "followUp": "How would you see what each side was actually trying to do before choosing?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["ci"],
+          "prompt": "What should a CI pipeline run on every pull request, at minimum?",
+          "choices": [
+            "Just the build",
+            "Install from the lockfile, lint, type-check, run tests, and build — failing the PR if any step fails",
+            "A full deployment to production",
+            "Nothing — checks run after merge"
+          ],
+          "answer": 1,
+          "explanation": "The point is that main is always releasable, which requires checking before merge rather than after. Lint and type-check are seconds and catch the cheap things; tests catch the rest; the build proves it compiles in a clean environment rather than only on the author's machine. Running checks only after merge means main is broken by the time you find out, and someone else pulls it.",
+          "followUp": "What would you add to that pipeline once the project is in production?",
+          "estSeconds": 60
+        },
+        {
+          "type": "order",
+          "difficulty": 1,
+          "frequency": 2,
+          "tags": ["workflow"],
+          "prompt": "Order a standard feature branch workflow.",
+          "choices": [
+            "Branch from an up-to-date main",
+            "Commit work in focused commits",
+            "Sync with main and resolve any conflicts",
+            "Open a pull request and address review feedback",
+            "Merge to main and delete the branch"
+          ],
+          "answer": [0, 1, 2, 3, 4],
+          "explanation": "Branching from a stale main means conflicts you created for yourself. Syncing *before* opening the PR means reviewers see the real diff against current main, not a mixture of your work and everyone else's. Deleting the branch afterwards keeps the branch list meaningful — a repo with 200 stale branches is one where nobody can tell what's in flight.",
+          "followUp": "How often would you sync a branch that lives for a week?",
+          "estSeconds": 60
+        }
+      ]
+    },
+    {
+      "slug": "testing",
+      "name": "Testing",
+      "level": "working",
+      "summary": "What to test, what to mock, and how to write a test that still helps in six months.",
+      "interviewAngle": "'How do you decide what to test?' separates people who write tests from people who write tests to hit a coverage number.",
+      "keyPoints": [
+        "Unit tests are fast and narrow; integration tests catch the wiring; E2E covers critical journeys",
+        "Arrange–Act–Assert keeps tests readable",
+        "Test behaviour, not implementation — otherwise every refactor breaks the suite",
+        "Mock what you don't own and what's slow; don't mock the thing under test",
+        "Coverage measures what ran, not what was verified"
+      ],
+      "items": [
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["strategy"],
+          "prompt": "How do you decide what to test on a CRUD app?",
+          "keywords": [
+            "logic|business logic|rules|branches",
+            "edge case|boundary|error|failure path",
+            "integration|endpoint|wiring|route",
+            "not test|trivial|getters|framework",
+            "risk|value|critical|important",
+            "coverage|100%|number"
+          ],
+          "modelAnswer": "I start from risk rather than from coverage. What would be most expensive if it broke — money, permissions, data loss — and what has the most branching logic? Those get thorough unit tests, including the error paths and boundaries, which is where the bugs actually are.\n\nWhat I don't test: getters, framework behaviour, and code with no decisions in it. A test asserting that a mapper copies four fields costs maintenance and catches nothing.\n\nOn a CRUD app the highest-value tests are usually integration tests at the endpoint level: send a real request, assert the status and the response, and check the database. They catch routing, serialisation, validation, auth and query mistakes in one go — the things that actually break — and they don't lock you into an implementation, so you can refactor the service layer freely.\n\nI'd add a small number of E2E tests for the journeys that must never break: log in, create the main entity, pay.\n\nOn coverage: I use it to find untested areas, not as a target. Hitting 100% is easy with tests that execute code and assert nothing, and mandating a number reliably produces exactly those.",
+          "explanation": "Risk-based prioritisation, naming what you *don't* test, and the coverage caveat are the three things that mark a considered answer.",
+          "followUp": "Which would you write first for a new endpoint — the unit test or the integration test?",
+          "estSeconds": 210
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["mocking"],
+          "prompt": "What should you mock in a unit test?",
+          "choices": [
+            "Everything except the class under test",
+            "Slow or non-deterministic collaborators you don't own — the network, the clock, third-party APIs — and leave simple in-process collaborators real",
+            "Nothing — always use real dependencies",
+            "Only the database"
+          ],
+          "answer": 1,
+          "explanation": "Mocking everything produces tests that verify your mocks, pass while the real system is broken, and break on every refactor. Mocking nothing gives you slow, flaky tests coupled to a database and someone else's uptime. The line is roughly: mock what you don't own, what's slow, and what's non-deterministic (time, randomness, network). Leave your own value objects and simple collaborators real — they make the test more truthful, not less.",
+          "followUp": "How do you test code that depends on the current date?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["test-quality"],
+          "prompt": "What's wrong with this test?",
+          "code": "it('works', () => {\n  const result = calculateTotal([{ price: 10, qty: 2 }]);\n  expect(result).toBeTruthy();\n});",
+          "language": "js",
+          "answer": "the name says nothing and toBeTruthy passes for any non-zero value — it would pass if the answer were wrong",
+          "explanation": "`toBeTruthy()` passes for 20, for 1, for `\"banana\"`. The test proves the function returned something. Assert the actual expected value — `expect(result).toBe(20)` — and name the test after the behaviour: `'multiplies price by quantity'`. A good test name is documentation and, when it fails in CI six months from now, it's the only context the person on call has.",
+          "followUp": "What other cases would you add for this function?",
+          "estSeconds": 75
+        },
+        {
+          "type": "fill",
+          "difficulty": 1,
+          "frequency": 2,
+          "tags": ["aaa"],
+          "prompt": "Name the three phases of a well-structured test.",
+          "code": "it('rejects an order over the credit limit', () => {\n  // 1. _______ — set up the customer and the order\n  // 2. _______ — call placeOrder\n  // 3. _______ — expect it to throw CreditLimitExceeded\n});",
+          "language": "js",
+          "answer": ["Arrange", "Act", "Assert"],
+          "explanation": "Arrange–Act–Assert (Given–When–Then in BDD terms) keeps tests scannable — a reader finds the setup, the one call being tested, and the expectation without parsing the whole body. The discipline it enforces is one *act* per test: if you're acting twice, that's two tests, and when it fails you'll know which behaviour broke.",
+          "followUp": "Should a test ever have more than one assertion?",
+          "estSeconds": 45
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["flaky-tests"],
+          "prompt": "Which cause flaky tests? Select all that apply.",
+          "choices": [
+            "Depending on the current date or time",
+            "Tests sharing mutable state or a database without cleanup",
+            "Fixed sleeps instead of waiting for a condition",
+            "Depending on test execution order",
+            "Asserting on an exact expected value"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "All four of those are non-determinism. Fixed sleeps are the worst offender in E2E suites: too short and it's flaky on a slow CI machine, too long and the suite takes an hour — wait for the condition instead. Flaky tests are more corrosive than missing ones, because once people start rerunning until green, a genuine failure gets rerun too. Quarantine and fix them, or delete them.",
+          "followUp": "A test fails once a week in CI and passes on rerun. What do you do?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["coverage"],
+          "prompt": "Your team mandates 100% coverage. What's the risk?",
+          "choices": [
+            "None — more coverage is always better",
+            "Coverage measures which lines executed, not whether behaviour was verified — a mandate produces assertion-free tests and tests for trivial code, while the hard paths stay untested",
+            "It makes the build slow",
+            "It's impossible to achieve"
+          ],
+          "answer": 1,
+          "explanation": "A test that calls a function and asserts nothing gives full coverage of it. So the metric can be satisfied without testing anything, and when it's a gate, that's exactly what happens under deadline. Coverage is useful as a *finder* — the uncovered report shows you paths nobody exercised, and error handlers are usually in there. As a target it becomes the goal instead of the proxy.",
+          "followUp": "What would you measure instead, if not coverage?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["brittle-tests"],
+          "prompt": "Every refactor breaks dozens of tests even though behaviour is unchanged. What's the underlying problem?",
+          "choices": [
+            "Not enough tests",
+            "The tests assert on implementation — internal method calls, private state, exact mock interactions — instead of on observable behaviour",
+            "The tests are too slow",
+            "Refactoring is inherently risky"
+          ],
+          "answer": 1,
+          "explanation": "A test that asserts `expect(repo.save).toHaveBeenCalledWith(...)` is pinned to *how* the code works, so any change in how breaks it even when the outcome is identical. That inverts the value of the suite: tests are supposed to make refactoring safe, and instead they're the reason it's expensive. Assert on what a caller can observe — the return value, the response, the resulting state — and the same tests survive a rewrite of the internals.",
+          "followUp": "Is asserting that an email was sent an implementation detail or a behaviour?",
+          "estSeconds": 75
+        },
+        {
+          "type": "order",
+          "difficulty": 2,
+          "frequency": 1,
+          "tags": ["tdd", "debugging"],
+          "prompt": "A bug is reported in production. Order how you'd handle it.",
+          "choices": [
+            "Reproduce it locally",
+            "Write a failing test that captures the bug",
+            "Fix the code until the test passes",
+            "Check whether the same mistake exists elsewhere"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "Reproduce first, or you're guessing — 'fixed' without a reproduction usually means the symptom moved. The failing test is what proves you actually understand the cause, and it stays as a permanent regression guard for a bug that has already escaped once. The last step is the one people skip: a bug is often a pattern, and the same missing null check probably exists in three other handlers.",
+          "followUp": "What if the bug can't be reproduced locally?",
+          "estSeconds": 75
+        }
+      ]
+    },
+    {
+      "slug": "app-architecture",
+      "name": "Application Architecture",
+      "level": "professional",
+      "summary": "How the pieces fit — client, server, database, cache — and the design questions asked at mid-level.",
+      "interviewAngle": "'Design a URL shortener / a booking system' scaled to mid-level: they want sensible layering, caching and failure thinking, not distributed-systems theatre.",
+      "keyPoints": [
+        "Start with the simplest thing that works and know what you'd change first under load",
+        "Caching adds staleness — you must decide how you'll invalidate",
+        "Scale horizontally by keeping the app stateless; push state to the database or cache",
+        "Queues decouple slow or unreliable work from the request path",
+        "SSR/SSG/CSR are a tradeoff between time-to-content, SEO and infrastructure"
+      ],
+      "items": [
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": ["system-design", "scaling"],
+          "prompt": "Your CRUD app is slow now that it has real users. Walk me through how you'd find and fix it.",
+          "keywords": [
+            "measure|profile|metrics|monitor|apm",
+            "database|query|slow query|index|n+1",
+            "cache|caching|redis",
+            "horizontal|scale out|instances|load balancer",
+            "cdn|static|assets",
+            "queue|background|async"
+          ],
+          "modelAnswer": "Measure before changing anything. Which endpoints are slow, at which percentiles, and where does the time go — app, database, or a downstream call? An APM trace answers that in minutes and stops me optimising the wrong layer.\n\nIn practice it's almost always the database. The usual finds are an N+1 from lazy loading, a missing index on a column that grew, a query fetching whole rows to count them, or pagination that was never added. Fixing those is usually the whole exercise, and it's cheaper than any infrastructure change.\n\nNext, what doesn't need to be in the request at all. Sending an email, generating a PDF, calling a slow third party — those go on a queue and the request returns immediately.\n\nThen caching, in the right order: static assets on a CDN, then HTTP caching headers for responses that tolerate it, then an application cache like Redis for expensive computed results. The hard part isn't caching, it's invalidation — I need a story for how stale data gets corrected, and I'd rather cache with a short TTL than build an elaborate invalidation scheme that's wrong in one branch.\n\nOnly then would I scale out: more instances behind a load balancer, which requires the app to be stateless — no in-memory sessions, no local file uploads. If the database is the bottleneck, read replicas for read-heavy loads.\n\nAnd throughout I'd be checking that I'm solving today's problem. Sharding a database with 50,000 rows because it might grow is how a two-person team ends up with an unmaintainable system.",
+          "explanation": "The order — measure, fix queries, offload, cache, then scale — matters more than the individual techniques. Resisting premature distribution is a strong signal.",
+          "followUp": "You add Redis. What breaks that didn't before?",
+          "estSeconds": 300
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["stateless", "scaling"],
+          "prompt": "Why must an app be stateless to scale horizontally?",
+          "choices": [
+            "Stateless apps use less memory",
+            "Any instance must be able to serve any request — in-memory session or cached state means a user's second request hits a different instance that doesn't have it",
+            "Load balancers can't route stateful traffic",
+            "It's a framework requirement"
+          ],
+          "answer": 1,
+          "explanation": "With three instances behind a load balancer, consecutive requests from one user can land anywhere. If the session lives in instance A's memory, the request that lands on B looks logged out. Sticky sessions paper over it and then break when an instance is replaced — which happens routinely during a deploy or autoscale. Push shared state out: sessions to Redis or a signed cookie, uploads to object storage, cached data to a shared cache.",
+          "followUp": "What else besides sessions is secretly per-instance state?",
+          "estSeconds": 60
+        },
+        {
+          "type": "multi",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["caching"],
+          "prompt": "You add a cache in front of a slow query. What must you now think about? Select all that apply.",
+          "choices": [
+            "How stale the data may be, and whether that's acceptable",
+            "How the entry is invalidated when the underlying data changes",
+            "What happens when the cache is empty or down",
+            "Whether concurrent misses all hit the database at once",
+            "Nothing — caching is transparent"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "Caching converts a performance problem into a correctness problem. Staleness must be a deliberate decision, not a surprise. Invalidation needs a plan — TTL is the simple, boring, usually-correct answer. The cache must be optional, or an outage takes the app down with it. And the fourth is the cache stampede: an entry expires under load and a thousand requests miss simultaneously, hitting the database harder than if there were no cache at all.",
+          "followUp": "How do you prevent a stampede when a hot key expires?",
+          "estSeconds": 90
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["rendering", "ssr"],
+          "prompt": "When does server-side rendering earn its complexity over a plain client-rendered SPA?",
+          "choices": [
+            "Always — SSR is strictly better",
+            "When SEO matters, when time-to-content on slow devices matters, or when you want data fetched close to the database rather than over a client round trip",
+            "Only for static marketing sites",
+            "Never — it's a fad"
+          ],
+          "answer": 1,
+          "explanation": "A client-rendered app ships a shell, then JS, then makes a request, then paints — several round trips before there's content, and crawlers may not wait. SSR sends HTML with the content in it. The cost is real: you now need a Node server rather than a static bucket, hydration bugs become possible, and you have to think about what runs where. For an internal admin tool behind a login, none of the benefits apply and CSR is the simpler answer.",
+          "followUp": "What's hydration, and what kind of bug is unique to it?",
+          "estSeconds": 75
+        },
+        {
+          "type": "order",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["queues", "async"],
+          "prompt": "A user uploads a video that needs transcoding. Order the request flow.",
+          "choices": [
+            "Accept the upload, store the file, and create a job record marked pending",
+            "Return 202 Accepted with a way for the client to check status",
+            "A worker picks the job off the queue and transcodes",
+            "The worker updates the job record and notifies the user"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "Anything that takes minutes cannot happen inside a request — the connection times out, a retry starts a second transcode, and a deploy kills the work halfway. Accept, persist, enqueue, return 202 with a status URL. The client polls or listens on a websocket. The details that matter: the job must be idempotent because queues deliver at-least-once, and a failure needs a retry limit and a dead-letter queue so a poisoned job doesn't loop forever.",
+          "followUp": "The worker crashes mid-transcode. What should happen?",
+          "estSeconds": 105
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["microservices", "monolith"],
+          "prompt": "When should a small team split a monolith into microservices?",
+          "choices": [
+            "As soon as possible — monoliths don't scale",
+            "Usually not yet: microservices trade in-process calls for network calls, transactions for eventual consistency, and one deploy for many. Split when team or scaling boundaries genuinely demand it",
+            "When the codebase exceeds 10,000 lines",
+            "Only for public APIs"
+          ],
+          "answer": 1,
+          "explanation": "A well-structured monolith scales a long way, and it lets you refactor a boundary you got wrong with a rename rather than a migration. Microservices solve an *organisational* problem first — independent teams deploying independently — and they cost you distributed transactions, network failure modes, versioned contracts between services, and observability infrastructure you now genuinely need. The honest answer for most mid-sized products is a modular monolith with clear internal boundaries, which is also the best position from which to split later.",
+          "followUp": "If you were going to split eventually, what would you do now to make it possible?",
+          "estSeconds": 90
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["idempotency"],
+          "prompt": "Name the request header that makes this payment safe to retry after a timeout.",
+          "code": "POST /api/payments\n___-Key: 7f3c9e21-...\n\n{ \"amount\": 5000, \"currency\": \"GBP\" }",
+          "language": "http",
+          "answer": ["Idempotency"],
+          "explanation": "The client generates a key per logical operation and re-sends the same one on retry. The server stores the key with the result: a repeat returns the original response instead of charging again. This is how Stripe and every serious payments API handle the fact that a timeout tells you nothing about whether the request succeeded. Without it, a network blip and an impatient user's second click are indistinguishable from two genuine payments.",
+          "followUp": "How long should the server remember an idempotency key?",
+          "estSeconds": 75
+        },
+        {
+          "type": "multi",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["failure", "resilience"],
+          "prompt": "A third-party API you depend on goes down. Which are reasonable responses? Select all that apply.",
+          "choices": [
+            "Time out quickly rather than holding the request open",
+            "Retry with exponential backoff and jitter",
+            "Retry immediately in a tight loop until it works",
+            "A circuit breaker that stops calling after repeated failures and probes periodically",
+            "Degrade gracefully — serve cached or partial data where the feature allows"
+          ],
+          "answer": [0, 1, 3, 4],
+          "explanation": "A tight retry loop is a denial-of-service attack on a service that's already struggling, and it exhausts your own threads and connections. Backoff with jitter spreads the load so all your instances don't retry in lockstep. A circuit breaker stops you queuing thousands of doomed calls and lets the dependency recover. And the product question matters: if reviews can't load, show the page without them rather than failing the whole request.",
+          "followUp": "What's the danger of retrying a request that isn't idempotent?",
+          "estSeconds": 90
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,729 @@
+{
+  "track": {
+    "id": "trk-typescript",
+    "slug": "typescript",
+    "name": "TypeScript",
+    "tagline": "Types that catch the bug before the reviewer does",
+    "description": "Annotations and inference, interfaces vs type aliases, narrowing, generics, and the tsconfig flags that decide how much the compiler actually helps you. Every modern React and Node job on this stack expects it.",
+    "icon": "TS",
+    "accent": "sky",
+    "sortOrder": 2
+  },
+  "modules": [
+    {
+      "slug": "ts-foundations",
+      "name": "Annotations & Inference",
+      "level": "foundation",
+      "summary": "When to annotate and when to let the compiler work it out, plus the types beginners misuse.",
+      "interviewAngle": "They'll ask 'why TypeScript?' and then check whether you annotate everything (noise) or nothing (no safety). The answer is: annotate boundaries, infer internals.",
+      "keyPoints": [
+        "Annotate function parameters and public return types; let locals infer",
+        "`any` disables checking entirely; `unknown` forces you to narrow first",
+        "`const` infers a literal type, `let` widens to the primitive",
+        "Types are erased at compile time — nothing survives to runtime",
+        "`interface` and `type` overlap heavily; interfaces can be reopened, type aliases can express unions"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["any", "unknown"],
+          "prompt": "What is the difference between `any` and `unknown`?",
+          "choices": [
+            "None — `unknown` is just the newer spelling",
+            "`any` turns off type checking for that value; `unknown` accepts anything but forces you to narrow before using it",
+            "`unknown` allows any operation; `any` allows none",
+            "`unknown` is only valid as a return type"
+          ],
+          "answer": 1,
+          "explanation": "Both accept any value going in. The difference is coming out: with `any` you can call, index and pass the value anywhere with no complaint — it silently disables checking, and that disabled-ness spreads through everything it touches. With `unknown` the compiler refuses every operation until you narrow it with a typeof check, an `instanceof`, or a type guard. `unknown` is the right type for `JSON.parse` results, caught errors, and any external input.",
+          "followUp": "What type does `catch (err)` give you, and how do you handle it properly?",
+          "estSeconds": 45
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["inference", "literal-types"],
+          "prompt": "TypeScript infers a type for each. What are they?",
+          "code": "const a = 'hello';\nlet b = 'hello';",
+          "language": "ts",
+          "answer": "a: \"hello\"\nb: string",
+          "explanation": "`const` can never be reassigned, so TypeScript keeps the narrowest possible type: the literal `\"hello\"`. `let` might be reassigned, so it widens to `string`. This matters when you pass a value to something expecting a union: `const dir = 'left'` is assignable to `'left' | 'right'`, but `let dir = 'left'` is not — it's already widened. The fixes are `as const` or an explicit annotation.",
+          "followUp": "How does `as const` change the inferred type of an object literal?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["why-typescript"],
+          "prompt": "Why use TypeScript on a CRUD web app? What does it not give you?",
+          "keywords": [
+            "compile time|before runtime|catch|earlier",
+            "refactor|rename|refactoring",
+            "autocomplete|intellisense|editor|tooling",
+            "documentation|self-documenting|contract",
+            "erased|no runtime|runtime validation|does not validate"
+          ],
+          "modelAnswer": "The payoff is catching a whole class of bug at compile time instead of in production — typos in property names, forgetting a null check, changing a function's shape and missing a call site. On a CRUD app the biggest win is refactoring confidence: rename a field on a model and the compiler shows you every place that breaks, which no amount of test coverage does as cheaply.\n\nSecond is tooling. Accurate autocomplete and go-to-definition across an API boundary makes onboarding faster, and the types serve as documentation that can't drift from the code.\n\nWhat it doesn't give you: any runtime guarantee. Types are erased on compile, so a JSON response typed as `User` is just an assertion — if the API sends something else, TypeScript never notices. That's why I validate external input at the boundary with something like Zod and derive the type from the schema. It also doesn't prevent logic bugs, and `any` at the wrong boundary quietly undoes all of it.",
+          "explanation": "The distinguishing answer covers both sides: compile-time safety and refactoring on the plus side, and the erasure/runtime-validation gap on the minus. Naming a validation library shows you've dealt with it for real.",
+          "followUp": "Where exactly in a Next.js app would you put that runtime validation?",
+          "estSeconds": 150
+        },
+        {
+          "type": "fill",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["functions", "annotations"],
+          "prompt": "Type this function: it takes a list of users and an optional page size, and returns the users' names.",
+          "code": "function names(users: User[], size___: number): ___ {\n  return users.slice(0, size).map((u) => u.name);\n}",
+          "language": "ts",
+          "answer": ["?", "string[]"],
+          "explanation": "`size?: number` makes the parameter optional — its type inside the function becomes `number | undefined`, which is why `slice` accepting `undefined` matters here. The return annotation `string[]` is worth writing even though it could be inferred: it makes the function's contract explicit and turns a mistake in the body into an error *here*, rather than at every call site.",
+          "followUp": "What's the difference between `size?: number` and `size: number | undefined`?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["interface", "type"],
+          "prompt": "Which is something a `type` alias can do that an `interface` cannot?",
+          "choices": [
+            "Describe the shape of an object",
+            "Be extended",
+            "Express a union, like `'sm' | 'md' | 'lg'`",
+            "Be implemented by a class"
+          ],
+          "answer": 2,
+          "explanation": "Type aliases can name unions, intersections, tuples, mapped and conditional types — an interface can only describe an object or function shape. Conversely, interfaces support declaration merging (declare the same name twice and they combine), which is how you augment library types. Both can be extended and both can be implemented. For a typical app: use `interface` for object shapes you might extend, `type` for everything else, and don't lose sleep over it — just be consistent.",
+          "followUp": "Give a case where declaration merging is genuinely useful.",
+          "estSeconds": 45
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["erasure", "runtime"],
+          "prompt": "The API actually returns `{ id: \"7\" }` — a string id. What does this log?",
+          "code": "type User = { id: number };\n\nconst res = await fetch('/api/user');\nconst user: User = await res.json();\n\nconsole.log(typeof user.id);",
+          "language": "ts",
+          "answer": "string",
+          "explanation": "`res.json()` returns `Promise<any>`, so annotating the variable as `User` is an unchecked assertion, not a validation. Types are erased at compile time — nothing checks the payload at runtime. The compiler will happily let you do `user.id.toFixed(2)`, and it throws in production. This is the single most common way a TypeScript codebase lies to itself, and the fix is parsing the response through a schema validator at the boundary.",
+          "followUp": "Show roughly what that boundary validation looks like.",
+          "estSeconds": 75
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["arrays", "tuples"],
+          "prompt": "Which are valid ways to type an array of numbers or a fixed pair? Select all that apply.",
+          "choices": [
+            "number[]",
+            "Array<number>",
+            "[number, number] for exactly two numbers",
+            "(number)[] for exactly one number",
+            "readonly number[] for an array that can't be mutated"
+          ],
+          "answer": [0, 1, 2, 4],
+          "explanation": "`number[]` and `Array<number>` are identical — pick one and be consistent. `[number, number]` is a tuple: fixed length, position-typed, which is what `useState` returns. `(number)[]` is just `number[]` with pointless parentheses. `readonly number[]` (or `ReadonlyArray<number>`) removes the mutating methods at compile time, which is a good default for function parameters you don't intend to modify.",
+          "followUp": "Why is `readonly` a good default for parameters?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["void", "never"],
+          "prompt": "What does the return type `never` mean?",
+          "choices": [
+            "The function returns undefined",
+            "The function never returns normally — it always throws or loops forever",
+            "The function returns null",
+            "The function has no parameters"
+          ],
+          "answer": 1,
+          "explanation": "`void` means 'returns, but the value is not useful'. `never` means control flow never reaches the end — the function throws, calls `process.exit`, or loops forever. It's also what a fully-narrowed union collapses to, which is the basis of exhaustiveness checking: in a switch's `default` branch, assign the value to a `never` variable and the compiler errors the day someone adds a new case.",
+          "followUp": "Write that exhaustiveness check for a `Status` union.",
+          "estSeconds": 45
+        }
+      ]
+    },
+    {
+      "slug": "ts-object-types",
+      "name": "Object Types & Unions",
+      "level": "foundation",
+      "summary": "Optional and readonly properties, index signatures, unions and intersections, and modelling real API shapes.",
+      "interviewAngle": "You'll be asked to type a real response payload on a whiteboard. Getting optionality and nullability right is the whole test.",
+      "keyPoints": [
+        "`?` means the key may be absent; `| null` means it's present and empty — these are different",
+        "Index signatures type dynamic keys but weaken safety; `Record<K, V>` is usually better",
+        "Intersections (`&`) combine object types; unions (`|`) mean 'one of these'",
+        "Excess property checks fire on object literals but not on variables",
+        "Model impossible states out of existence with discriminated unions"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["optional", "nullable"],
+          "prompt": "An API returns a user whose `avatarUrl` key is always present but may be empty. Which type is most accurate?",
+          "choices": [
+            "avatarUrl?: string",
+            "avatarUrl: string | null",
+            "avatarUrl: string",
+            "avatarUrl?: string | null | undefined"
+          ],
+          "answer": 1,
+          "explanation": "`?` says the key may be missing entirely — that's a different fact from 'the key is there and holds no value'. Since the API always sends the key, `string | null` is the honest type, and it forces callers to handle the empty case. Option 4 is the type you write when you haven't decided, and it makes every consumer handle two flavours of nothing.",
+          "followUp": "How does `exactOptionalPropertyTypes` change what `?` means?",
+          "estSeconds": 45
+        },
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["discriminated-unions"],
+          "prompt": "What is a discriminated union and why would you use one for a data-fetching state?",
+          "keywords": [
+            "union|one of",
+            "discriminant|tag|common property|literal",
+            "narrow|narrowing|switch|check",
+            "impossible|invalid state|can't happen",
+            "loading|error|success|data"
+          ],
+          "modelAnswer": "It's a union of object types that all share one property holding a distinct literal — the discriminant. Checking that property narrows the whole object to one member.\n\nFor fetching, the naive shape is `{ loading: boolean; data?: T; error?: Error }`, which allows nonsense: loading *and* an error, or neither loading nor data. A discriminated union makes those states unrepresentable:\n\n```\ntype State<T> =\n  | { status: 'idle' }\n  | { status: 'loading' }\n  | { status: 'success'; data: T }\n  | { status: 'error'; error: Error };\n```\n\nNow `if (state.status === 'success')` gives you `state.data` with no optional chaining and no non-null assertion, and the compiler stops you reading `data` in the error branch. Combined with an exhaustive switch you also get a compile error the day someone adds a `'refetching'` state and forgets a branch.",
+          "explanation": "The phrase they're listening for is 'make invalid states unrepresentable'. Anyone can define a union; knowing why the boolean-flags version is worse is the mid-level signal.",
+          "followUp": "How do you make the compiler enforce that the switch handles every case?",
+          "estSeconds": 180
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["excess-property-check"],
+          "prompt": "One of these two assignments is an error. Which line, and why?",
+          "code": "type Options = { retries: number };\n\nconst a: Options = { retries: 3, timeout: 100 };\n\nconst raw = { retries: 3, timeout: 100 };\nconst b: Options = raw;",
+          "language": "ts",
+          "answer": "line 3 (const a) — excess property check on object literals",
+          "explanation": "TypeScript runs an *excess property check* only when you assign a fresh object literal directly to a typed target — it assumes an unexpected key is a typo. Assigning through a variable falls back to plain structural compatibility: `raw` has everything `Options` needs, so extra properties are fine. It surprises people, but the rule is deliberate: literals are where typos happen.",
+          "followUp": "How would you deliberately allow extra properties on the literal?",
+          "estSeconds": 90
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["record", "index-signature"],
+          "prompt": "Type a lookup from a status string to a numeric HTTP code, where the keys are exactly `'ok' | 'missing' | 'denied'`.",
+          "code": "type Status = 'ok' | 'missing' | 'denied';\n\nconst codes: ___<Status, ___> = {\n  ok: 200,\n  missing: 404,\n  denied: 403,\n};",
+          "language": "ts",
+          "answer": ["Record", "number"],
+          "explanation": "`Record<Status, number>` requires an entry for *every* member of the union — add a fourth status and this object becomes a compile error until you handle it. An index signature `{ [key: string]: number }` would accept any key and, worse, would let you read `codes.typo` as a `number` that's actually `undefined` at runtime (unless `noUncheckedIndexedAccess` is on).",
+          "followUp": "What does `noUncheckedIndexedAccess` change about reading from an index signature?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["utility-types"],
+          "prompt": "You have `type User = { id: string; name: string; email: string }`. Which type describes the body of a PATCH request — any subset of the editable fields, never the id?",
+          "choices": [
+            "Partial<User>",
+            "Omit<User, 'id'>",
+            "Partial<Omit<User, 'id'>>",
+            "Pick<User, 'name' | 'email'>"
+          ],
+          "answer": 2,
+          "explanation": "PATCH is a partial update, so every field must be optional — that's `Partial`. And the id comes from the URL, not the body, so it must be excluded — that's `Omit`. Composed: `Partial<Omit<User, 'id'>>`. Option 2 keeps every field required, and option 4 is the right *fields* but still requires both. Deriving request types from the model like this means adding a column updates the DTO for free.",
+          "followUp": "What would the POST (create) body type be?",
+          "estSeconds": 60
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["unions", "intersections"],
+          "prompt": "Which statements are true? Select all that apply.",
+          "choices": [
+            "`A & B` requires a value to satisfy both A and B",
+            "`A | B` lets you access any property from either type without narrowing",
+            "`A | B` only lets you access properties present on both types",
+            "Intersecting two object types with the same key at incompatible types gives `never` for that key",
+            "Unions of object types are how you model 'one of several shapes'"
+          ],
+          "answer": [0, 2, 3, 4],
+          "explanation": "On a union you can only touch the common members until you narrow — that's the whole point, and it's why the discriminant property exists. Intersections combine requirements, and if the same key is `string` in one and `number` in the other, no value can satisfy both, so the key's type is `never`.",
+          "followUp": "So how do you access a property that only exists on one member of a union?",
+          "estSeconds": 75
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 1,
+          "tags": ["readonly"],
+          "prompt": "Does this compile? If not, which line fails?",
+          "code": "type Config = { readonly retries: number; tags: readonly string[] };\n\nconst c: Config = { retries: 3, tags: ['a'] };\nc.retries = 5;\nc.tags.push('b');",
+          "language": "ts",
+          "answer": "no — lines 4 and 5 both fail",
+          "explanation": "`readonly retries` blocks reassignment of the property. `readonly string[]` removes the mutating methods entirely, so `push` doesn't exist on the type. Both are compile-time only — at runtime the object is perfectly mutable, and `Object.freeze` is what actually enforces it. `readonly` is about expressing intent to other developers and to the compiler.",
+          "followUp": "So when is `readonly` worth the keystrokes, given it does nothing at runtime?",
+          "estSeconds": 75
+        },
+        {
+          "type": "order",
+          "difficulty": 2,
+          "frequency": 1,
+          "tags": ["modelling"],
+          "prompt": "Order these steps for typing a new API endpoint's response, from first to last.",
+          "choices": [
+            "Look at a real response payload from the running API",
+            "Write the type with accurate optionality and nullability",
+            "Validate the payload against a schema at the fetch boundary",
+            "Derive the narrower view types your components need from it"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "Start from reality, not from what you wish the API returned — hand-written types drift. Then write the type honestly, including the nulls. Then validate at the boundary so the type is a guarantee rather than a hope. Only then derive component-facing types with `Pick`/`Omit`, so there's exactly one source of truth. Better still, generate the type from an OpenAPI spec and skip the first two steps.",
+          "followUp": "What changes if the backend publishes an OpenAPI schema?",
+          "estSeconds": 75
+        }
+      ]
+    },
+    {
+      "slug": "ts-narrowing",
+      "name": "Narrowing & Type Guards",
+      "level": "working",
+      "summary": "Getting from `unknown` or a union down to the one type you can safely use.",
+      "interviewAngle": "'How do you handle `catch (err)`?' is a favourite, because the answer requires understanding that errors are `unknown` and why.",
+      "keyPoints": [
+        "typeof, instanceof, `in`, truthiness and equality all narrow",
+        "A user-defined type guard has the return type `arg is Type`",
+        "`catch` binds `unknown` under useUnknownInCatchVariables (part of strict)",
+        "Non-null assertion `!` silences the compiler without proving anything",
+        "Narrowing is lost across a callback or an await if the value could have changed"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["catch", "unknown"],
+          "prompt": "Under `strict`, what is the type of `err` in `catch (err)`, and how should you read a message from it?",
+          "choices": [
+            "`Error` — just use `err.message`",
+            "`any` — use `err.message`, TypeScript won't complain",
+            "`unknown` — check `err instanceof Error` before reading `.message`",
+            "`Error | null` — use `err?.message`"
+          ],
+          "answer": 2,
+          "explanation": "JavaScript lets you throw anything — a string, a number, an object from a library that doesn't subclass Error — so TypeScript types the catch binding as `unknown` under `useUnknownInCatchVariables`. The correct handling is `err instanceof Error ? err.message : String(err)`. Most codebases wrap that in a `toErrorMessage(err)` helper rather than repeating it.",
+          "followUp": "Why does `instanceof Error` sometimes fail across module or realm boundaries?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["type-guards"],
+          "prompt": "Write a user-defined type guard that proves a value is a `User`.",
+          "code": "function isUser(value: unknown): value ___ User {\n  return (\n    typeof value === 'object' &&\n    value !== null &&\n    'id' ___ value\n  );\n}",
+          "language": "ts",
+          "answer": ["is", "in"],
+          "explanation": "The `value is User` return type is a *type predicate*: when the function returns true, the compiler narrows the argument at the call site. The `in` operator checks for a property on an object and narrows too. Note the `value !== null` check — `typeof null` is `\"object\"`, so without it you'd crash on null. The compiler trusts your predicate blindly, so a wrong guard is worse than no guard.",
+          "followUp": "How does Zod's `safeParse` improve on a hand-written guard like this?",
+          "estSeconds": 90
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["narrowing", "callbacks"],
+          "prompt": "This fails to compile on the marked line. Why?",
+          "code": "function greet(name: string | null) {\n  if (name === null) return;\n\n  setTimeout(() => {\n    console.log(name.toUpperCase()); // <-- here\n  }, 100);\n}",
+          "language": "ts",
+          "answer": "it compiles — name is a const parameter, narrowing survives into the closure",
+          "explanation": "This one actually works: `name` is never reassigned, so TypeScript keeps the narrowing inside the callback. Change `name` to a `let` that's reassigned anywhere in the function and the narrowing is discarded at the closure boundary, because the compiler can't know what the value will be when the callback finally runs. The same reasoning applies to mutable object properties — `if (obj.a) { cb(() => obj.a.b) }` fails, and the fix is to copy to a local first.",
+          "followUp": "Why does narrowing on `obj.maybe` get discarded but narrowing on a local const doesn't?",
+          "estSeconds": 90
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["non-null-assertion"],
+          "prompt": "What does the `!` in `document.getElementById('root')!` actually do?",
+          "choices": [
+            "Throws at runtime if the value is null",
+            "Converts null to undefined",
+            "Tells the compiler to remove null and undefined from the type — with no runtime check at all",
+            "Is equivalent to an if-statement guard"
+          ],
+          "answer": 2,
+          "explanation": "It's a compile-time assertion and emits no code. You're telling the compiler 'trust me', and if you're wrong you get the exact `Cannot read properties of null` crash the type system was trying to prevent. It's occasionally justified — you genuinely know something static analysis can't, like an element your own HTML guarantees — but every `!` is a place you've turned safety off, and in review it should come with a comment explaining why.",
+          "followUp": "What would you write instead, in a codebase that bans `!`?",
+          "estSeconds": 45
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["narrowing"],
+          "prompt": "Which of these narrow a `string | number | null` value? Select all that apply.",
+          "choices": [
+            "typeof value === 'string'",
+            "if (value)",
+            "value instanceof String",
+            "Array.isArray(value)",
+            "value !== null"
+          ],
+          "answer": [0, 1, 4],
+          "explanation": "`typeof` is the standard narrowing tool for primitives, and `!== null` removes just the null. Truthiness narrows too — but be careful: `if (value)` also excludes `''` and `0`, which are often legitimate values, so it narrows more than you might intend. `instanceof String` only matches boxed String objects, which a primitive isn't. `Array.isArray` narrows arrays, but there's no array in this union.",
+          "followUp": "Where has `if (value)` bitten you when the value could legitimately be 0?",
+          "estSeconds": 75
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["assertions", "safety"],
+          "prompt": "When is `as SomeType` acceptable, and what's the safer alternative?",
+          "keywords": [
+            "assertion|assert|cast",
+            "no check|no runtime|compile time",
+            "lie|wrong|unsafe|trust",
+            "guard|type guard|validate|zod|schema|parse",
+            "test|mock|narrow"
+          ],
+          "modelAnswer": "`as` is an assertion, not a conversion: it changes what the compiler believes and emits no runtime code. If you're wrong, nothing tells you until something crashes downstream — usually far from the assertion.\n\nIt's defensible when you genuinely know more than the compiler and there's no cheaper way to prove it: `as const` for literal inference, narrowing a mock in a test, or asserting the shape of something you just constructed yourself two lines above. Also `as unknown as X` when bridging two library types you know are compatible — though that double assertion is a signal to stop and reconsider.\n\nIt's not acceptable at a trust boundary. `await res.json() as User` is the classic misuse: the data comes from outside your program, so the one place you actually need a check is the one place the assertion removes it. There the alternative is a schema parse — `UserSchema.parse(await res.json())` — which validates at runtime and gives you the type for free, so the type and the check can never disagree.\n\nBetween those, a hand-written type guard returning `value is User` is fine, as long as someone keeps it in sync with the type.",
+          "explanation": "The core distinction is 'I know something static analysis can't' versus 'this data came from outside'. The second is never an assertion case.",
+          "followUp": "What's the difference between `as` and `satisfies`?",
+          "estSeconds": 180
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["discriminated-unions", "exhaustiveness"],
+          "prompt": "Someone adds `'archived'` to `Status`. What happens at the marked line?",
+          "code": "type Status = 'draft' | 'live' | 'archived';\n\nfunction label(s: Status): string {\n  switch (s) {\n    case 'draft': return 'Draft';\n    case 'live': return 'Live';\n    default:\n      const never: never = s; // <-- here\n      return never;\n  }\n}",
+          "language": "ts",
+          "answer": "a compile error — 'archived' is not assignable to never",
+          "explanation": "In the default branch, `s` has been narrowed to whatever cases you didn't handle. Handle them all and that's `never`, so the assignment compiles. Miss one and `s` is `'archived'`, which isn't assignable to `never` — a compile error pointing exactly at the switch you forgot to update. This is the cheapest safety net in TypeScript and belongs in every switch over a union.",
+          "followUp": "How would you write this as a reusable `assertNever` helper?",
+          "estSeconds": 90
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["optional-chaining", "narrowing"],
+          "prompt": "`user.orders?.length` where `orders?: Order[]`. What's the type of that expression?",
+          "choices": ["number", "number | undefined", "number | null", "Order[] | undefined"],
+          "answer": 1,
+          "explanation": "Optional chaining short-circuits the whole expression to `undefined` when the link is nullish, so the result type gains `| undefined`. That means `if (user.orders?.length > 0)` is a compile error under strict — you can't compare `number | undefined` with `>`. Write `if (user.orders?.length)` (truthiness handles both) or `(user.orders?.length ?? 0) > 0`.",
+          "followUp": "Why does `?? 0` behave differently from `|| 0` here?",
+          "estSeconds": 60
+        }
+      ]
+    },
+    {
+      "slug": "ts-generics",
+      "name": "Generics & Utility Types",
+      "level": "working",
+      "summary": "Writing a function that keeps its caller's types, constraints, and the built-in utilities worth memorising.",
+      "interviewAngle": "You'll be asked to type a generic `fetchJson` or a reusable list component. They want to see constraints, not `any`.",
+      "keyPoints": [
+        "A generic parameter links input types to output types",
+        "`extends` constrains what a generic can be, unlocking property access",
+        "keyof + a generic key parameter types property lookups exactly",
+        "Partial, Pick, Omit, Record, Required, ReturnType, Awaited cover most needs",
+        "If a generic appears only once in a signature, it probably should have been `unknown`"
+      ],
+      "items": [
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["generics"],
+          "prompt": "Type `first` so that `first([1,2,3])` is `number | undefined` and `first(['a'])` is `string | undefined`.",
+          "code": "function first___(items: T[]): T | undefined {\n  return items[0];\n}",
+          "language": "ts",
+          "answer": ["<T>"],
+          "explanation": "The generic parameter `T` links the argument type to the return type: the compiler infers `T` from the call site, so no annotation is needed by the caller. Typing it as `any[] => any` would compile but lose everything downstream. Note the `| undefined` — an empty array returns nothing, and `noUncheckedIndexedAccess` would force you to admit that.",
+          "followUp": "How would you type `last` differently, and what about a non-empty-array version?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["generics", "constraints"],
+          "prompt": "Why does this fail, and what fixes it?",
+          "code": "function longestName<T>(items: T[]): T | undefined {\n  return items.sort((a, b) => b.name.length - a.name.length)[0];\n}",
+          "language": "ts",
+          "choices": [
+            "Nothing is wrong",
+            "`T` could be anything, so `.name` isn't known to exist — constrain it with `<T extends { name: string }>`",
+            "You must annotate the sort callback parameters",
+            "Generics can't be used with array methods"
+          ],
+          "answer": 1,
+          "explanation": "An unconstrained `T` means 'literally any type', so the compiler won't let you touch any property. `T extends { name: string }` says 'any type that at least has a string name', which unlocks `.name` while still returning the caller's exact type — pass `User[]` and you get `User | undefined`, not `{name: string} | undefined`. (Separately: `sort` mutates, so this function has a side effect its signature doesn't advertise.)",
+          "followUp": "Fix the mutation problem too.",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["keyof", "generics"],
+          "prompt": "Which signature makes `pluck(users, 'name')` return `string[]` and `pluck(users, 'age')` return `number[]`?",
+          "choices": [
+            "function pluck(items: object[], key: string): any[]",
+            "function pluck<T>(items: T[], key: string): T[keyof T][]",
+            "function pluck<T, K extends keyof T>(items: T[], key: K): T[K][]",
+            "function pluck<T>(items: T[], key: keyof T): unknown[]"
+          ],
+          "answer": 2,
+          "explanation": "Two linked generics do the work: `T` is the element type, and `K extends keyof T` pins the key to one *specific* property of `T` rather than the union of all of them. The return `T[K][]` is an indexed access type — the type of that one property. Option 2 returns the union of every property type, so you'd get `(string | number)[]`. This pattern shows up everywhere: form field helpers, sort-by-column utilities, ORM select clauses.",
+          "followUp": "How would you add a compile error when the key doesn't exist on T?",
+          "estSeconds": 90
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["utility-types"],
+          "prompt": "Match the need to the utility. Which of these are correct? Select all that apply.",
+          "choices": [
+            "`Partial<T>` — every property becomes optional",
+            "`Required<T>` — every property becomes required",
+            "`Pick<T, K>` — keep only the listed keys",
+            "`Omit<T, K>` — keep only the listed keys",
+            "`Awaited<T>` — unwrap the type a promise resolves to"
+          ],
+          "answer": [0, 1, 2, 4],
+          "explanation": "`Omit` removes the listed keys — it's the inverse of `Pick`. The rest are right. `Awaited<ReturnType<typeof fetchUser>>` is the idiom for 'whatever that async function actually resolves to', which saves you from exporting a type just to reference it. Also worth knowing: `NonNullable<T>`, `Parameters<T>`, and `Extract`/`Exclude` for filtering unions.",
+          "followUp": "How would you type the return of an async function without exporting its type?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 1,
+          "tags": ["generics", "inference"],
+          "prompt": "What type does TypeScript infer for `result`?",
+          "code": "async function fetchJson<T>(url: string): Promise<T> {\n  const res = await fetch(url);\n  return res.json();\n}\n\nconst result = await fetchJson('/api/users');",
+          "language": "ts",
+          "answer": "unknown",
+          "explanation": "`T` appears only in the return type, so there's nothing to infer it *from* — it defaults to `unknown` (or `any` in older versions, which is worse). This signature is a trap: it looks type-safe but really just lets the caller assert any type they like with `fetchJson<User>(...)`, unchecked. A safer design takes a validator: `fetchJson(url, UserSchema)` infers `T` from the schema and actually verifies the payload.",
+          "followUp": "Rewrite the signature so the type comes from something real.",
+          "estSeconds": 90
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["generics", "design"],
+          "prompt": "When does a function actually need a generic, and when is it just noise?",
+          "keywords": [
+            "relationship|link|connect|depends on|flows",
+            "input|output|return|parameter",
+            "twice|two places|more than once",
+            "unknown|any",
+            "caller|call site"
+          ],
+          "modelAnswer": "A generic earns its place when there's a *relationship* between types — the output type depends on the input type, or two parameters must agree. `first<T>(items: T[]): T | undefined` links them; the caller gets back their own type.\n\nThe rule of thumb is that a type parameter should appear at least twice in the signature. If `T` shows up only once, it isn't linking anything, and it's either a disguised `any` or should just be `unknown`. `function log<T>(value: T): void` is exactly `function log(value: unknown): void` with extra ceremony — and worse, `fetchJson<T>(url): Promise<T>` looks safe while actually letting the caller assert anything.\n\nThe other cost is readability. A signature with three constrained parameters and a conditional return type is technically impressive and genuinely hard to maintain. In application code — as opposed to a library — I'd usually take a concrete type and a bit of duplication over a clever generic that nobody else on the team can modify.",
+          "explanation": "The 'appears twice' heuristic is the concrete thing they're hoping to hear, along with recognising the `<T>(): Promise<T>` anti-pattern.",
+          "followUp": "So what's the right signature for a fetch helper?",
+          "estSeconds": 180
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["utility-types", "dto"],
+          "prompt": "From a `User` model, derive the type of a create request: everything except the server-generated `id` and `createdAt`.",
+          "code": "type CreateUser = ___<User, 'id' ___ 'createdAt'>;",
+          "language": "ts",
+          "answer": ["Omit", "|"],
+          "explanation": "`Omit<User, 'id' | 'createdAt'>` — the second parameter takes a union of keys. Deriving DTOs from the model instead of hand-writing them means a new column can't be silently missing from your create endpoint. The tradeoff is coupling: if the API shape should be able to diverge from the database model, an independent type is the more honest choice.",
+          "followUp": "When would you deliberately *not* derive the DTO from the model?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 1,
+          "tags": ["satisfies"],
+          "prompt": "What does `satisfies` give you that a type annotation doesn't?",
+          "code": "const routes = {\n  home: '/',\n  user: '/users/:id',\n} satisfies Record<string, string>;",
+          "language": "ts",
+          "choices": [
+            "Nothing — it's an alias for `as`",
+            "It checks the value against the type while keeping the narrower inferred type of the literal",
+            "It validates at runtime",
+            "It makes the object readonly"
+          ],
+          "answer": 1,
+          "explanation": "Annotating `const routes: Record<string, string>` would check the shape but widen the type — `routes.home` becomes `string` and `routes.typo` compiles. `satisfies` verifies the constraint and keeps the literal inference, so `routes.home` is the literal `'/'` and unknown keys are errors. It's the right tool for config objects, route maps and theme tokens.",
+          "followUp": "Where would `as const satisfies` be better than either alone?",
+          "estSeconds": 75
+        }
+      ]
+    },
+    {
+      "slug": "ts-in-practice",
+      "name": "tsconfig & Everyday Friction",
+      "level": "professional",
+      "summary": "The compiler flags that matter, why your build differs from your editor, and the errors you'll actually hit.",
+      "interviewAngle": "Asking about `strict` is a quick way to tell whether someone has configured a project or only worked inside one.",
+      "keyPoints": [
+        "`strict` is a bundle — strictNullChecks is the one that matters most",
+        "tsc type-checks but bundlers usually strip types without checking; run tsc in CI",
+        "`.d.ts` files describe JS libraries that have no types of their own",
+        "Path aliases need matching config in tsconfig *and* the bundler",
+        "Enums have runtime cost and odd semantics; unions or `as const` objects are usually better"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["tsconfig", "strict"],
+          "prompt": "Which sub-flag of `strict` has the biggest day-to-day impact?",
+          "choices": [
+            "noImplicitAny — parameters can't be silently `any`",
+            "strictNullChecks — null and undefined stop being assignable to every type",
+            "strictBindCallApply — bind/call/apply are type-checked",
+            "alwaysStrict — emits 'use strict'"
+          ],
+          "answer": 1,
+          "explanation": "Without `strictNullChecks`, `null` and `undefined` are members of every type, so `user.name.toUpperCase()` compiles even when `user` is null — the compiler cannot catch the most common runtime crash in JavaScript. Turning it on in an existing codebase surfaces hundreds of errors, and every one is a potential production bug. `noImplicitAny` is a close second.",
+          "followUp": "How would you migrate a large untyped codebase to strict without a six-month freeze?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["build", "ci"],
+          "prompt": "Your Next.js dev server runs fine but CI fails with type errors. How is that possible?",
+          "keywords": [
+            "transpile|strip|swc|esbuild|babel",
+            "not type check|no type checking|separate",
+            "tsc|--noemit|type check",
+            "editor|ide|language server",
+            "ci|build|pipeline"
+          ],
+          "modelAnswer": "Modern bundlers — SWC in Next, esbuild in Vite — don't type-check. They strip the type annotations and emit JavaScript, which is fast precisely because it skips the analysis. So the dev server happily runs code that doesn't type-check.\n\nYour editor *does* check, but only the files it has open in the language server, and it uses whatever TypeScript version is configured locally — which may not match CI.\n\nSo the only complete check is running `tsc --noEmit` over the whole project, and that's what CI does. The failure isn't a discrepancy, it's the first time anyone actually asked the question.\n\nThe fix is to make it not a surprise: `tsc --noEmit` as a `typecheck` npm script, run in a pre-commit hook or at least in CI on every push, with the TypeScript version pinned in devDependencies so local and CI agree. In VS Code, 'Use Workspace Version' does the same for the editor.",
+          "explanation": "The key insight is transpile ≠ type-check. Candidates who've only ever run `next dev` often don't know their build isn't checking anything.",
+          "followUp": "What's `skipLibCheck` doing in almost every tsconfig you've seen?",
+          "estSeconds": 150
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["enums", "unions"],
+          "prompt": "Why do many teams prefer a union of string literals over a TypeScript `enum`?",
+          "choices": [
+            "Enums are deprecated",
+            "Unions are erased at compile time, work directly with JSON strings, and don't generate runtime code",
+            "Enums can't be used in switch statements",
+            "Unions are faster at runtime"
+          ],
+          "answer": 1,
+          "explanation": "A `const enum` is inlined but breaks with isolated-modules bundlers; a regular `enum` emits a runtime object, which survives into your bundle and doesn't tree-shake well. Numeric enums are worse: they're bidirectional maps, and any number is assignable to one. A union like `type Status = 'draft' | 'live'` costs nothing at runtime, matches what the API actually sends over the wire, and gives the same autocomplete and exhaustiveness checks. If you want the values at runtime, an `as const` object plus `typeof obj[keyof typeof obj]` gives you both.",
+          "followUp": "Write that `as const` object pattern.",
+          "estSeconds": 75
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["declarations", "libraries"],
+          "prompt": "You install a JS library with no types. Which are legitimate ways forward? Select all that apply.",
+          "choices": [
+            "Install `@types/the-library` from DefinitelyTyped if it exists",
+            "Write a local `.d.ts` with `declare module 'the-library'`",
+            "Add `// @ts-ignore` above every import",
+            "Type just the handful of functions you use in your own `.d.ts`",
+            "Set `\"strict\": false` for the whole project"
+          ],
+          "answer": [0, 1, 3],
+          "explanation": "`@types/*` first — it's usually community-maintained and complete. Failing that, a local declaration file gets you compiling, and typing only the functions you actually call is a reasonable 20-minute job that gives real safety. `@ts-ignore` scattered through the codebase hides unrelated errors too, and disabling strict globally to accommodate one dependency trades your whole project's safety for one import.",
+          "followUp": "Where do you put a local `.d.ts` so tsc picks it up?",
+          "estSeconds": 75
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["errors"],
+          "prompt": "What's the fix for this classic error?\n\n`Type 'string | undefined' is not assignable to type 'string'`",
+          "code": "const id: string = params.get('id');",
+          "language": "ts",
+          "answer": "handle the undefined case — e.g. const id = params.get('id') ?? ''",
+          "explanation": "`URLSearchParams.get` returns `string | null` because the parameter may be absent. The compiler is pointing at a real possibility, not being pedantic. Options in order of preference: provide a default with `??`, guard with an early return and a 400 response, or — last resort — assert with `!` if you genuinely control the caller. Silencing it with `as string` just moves the crash later.",
+          "followUp": "In a Next.js route handler, what's the right response when a required query param is missing?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 1,
+          "frequency": 2,
+          "tags": ["tsconfig", "paths"],
+          "prompt": "Configure `@/` to resolve to the `src` directory.",
+          "code": "{\n  \"compilerOptions\": {\n    \"baseUrl\": \".\",\n    \"___\": {\n      \"@/*\": [\"___\"]\n    }\n  }\n}",
+          "language": "json",
+          "answer": ["paths", "./src/*"],
+          "explanation": "Path aliases replace `../../../components` with `@/components`. The catch is that tsconfig only teaches the *type checker* — the bundler needs to know too. Next.js and Vite read tsconfig paths automatically; Jest, Node and older webpack configs need a matching mapping, and a mismatch produces a build that type-checks but can't resolve the import at runtime.",
+          "followUp": "Where else would you need to repeat this mapping?",
+          "estSeconds": 45
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 1,
+          "tags": ["structural-typing"],
+          "prompt": "Why does this compile, even though `Point` and `Vector` are unrelated types?",
+          "code": "type Point = { x: number; y: number };\ntype Vector = { x: number; y: number };\n\nconst p: Point = { x: 1, y: 2 };\nconst v: Vector = p;",
+          "language": "ts",
+          "choices": [
+            "A bug in the compiler",
+            "TypeScript's type system is structural — compatibility is decided by shape, not by name",
+            "Because both are type aliases rather than interfaces",
+            "Because the properties are primitives"
+          ],
+          "answer": 1,
+          "explanation": "TypeScript compares shapes, not declarations — unlike C# or Java, where two identically-shaped classes are still different types. That's usually what you want (a plain object satisfies an interface with no `implements` clause), but it means the compiler can't stop you mixing up two things that happen to look alike, like a `UserId` and an `OrderId` that are both `string`. Branded types are the escape hatch: `type UserId = string & { __brand: 'UserId' }`.",
+          "followUp": "How would you make `UserId` and `OrderId` genuinely incompatible?",
+          "estSeconds": 75
+        },
+        {
+          "type": "order",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["migration"],
+          "prompt": "Order these steps for adding TypeScript to an existing JavaScript project.",
+          "choices": [
+            "Add TypeScript and a tsconfig with `allowJs` on and `strict` off",
+            "Rename files to .ts a module at a time, fixing errors as you go",
+            "Turn on `noImplicitAny`, then `strictNullChecks`, fixing the fallout in batches",
+            "Add `tsc --noEmit` to CI so nothing regresses"
+          ],
+          "answer": [0, 1, 2, 3],
+          "explanation": "Start permissive so the project still builds on day one — `allowJs` lets .js and .ts coexist. Convert incrementally, leaf modules first so you're not typing against untyped dependencies. Only then ratchet the strict flags up one at a time; turning on full `strict` at the start produces thousands of errors and the migration gets abandoned. CI enforcement goes on last, once you're passing, so it stays green.",
+          "followUp": "Which modules would you convert first, and why leaf modules?",
+          "estSeconds": 90
+        }
+      ]
+    }
+  ]
+}

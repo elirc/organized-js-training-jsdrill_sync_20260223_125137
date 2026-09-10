@@ -1,0 +1,889 @@
+{
+  "track": {
+    "id": "trk-react",
+    "slug": "react",
+    "name": "React",
+    "tagline": "From your first component to a CRUD screen that doesn't re-render the world",
+    "description": "Components and props, state and forms, effects and data fetching, the hooks that trip people up, and the list-detail-form patterns that make up most of a real admin app.",
+    "icon": "⚛",
+    "accent": "cyan",
+    "sortOrder": 3
+  },
+  "modules": [
+    {
+      "slug": "components-and-props",
+      "name": "Components, Props & Lists",
+      "level": "foundation",
+      "summary": "JSX, one-way data flow, rendering lists, and the key prop everyone gets wrong first.",
+      "interviewAngle": "The `key` question is asked in nearly every React interview, and index-as-key is the wrong answer they're hoping you'll avoid.",
+      "keyPoints": [
+        "Props flow down and are read-only — a component never mutates its own props",
+        "`key` must be stable and unique among siblings; array index breaks on reorder or insert",
+        "Components must return a single root — use a fragment when you don't want a wrapper element",
+        "Conditional rendering with `&&` leaks `0` into the DOM when the left side is a number",
+        "Composition (children) beats configuration (twenty boolean props)"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["keys", "lists"],
+          "prompt": "Why is using the array index as a `key` a problem?",
+          "code": "{todos.map((todo, i) => <Todo key={i} todo={todo} />)}",
+          "language": "jsx",
+          "choices": [
+            "It's slower to compute",
+            "React uses keys to match elements across renders — if the list reorders or an item is inserted, indices shift and React reuses the wrong component instance, carrying its state with it",
+            "Numeric keys are invalid; keys must be strings",
+            "It causes a full re-render of the list"
+          ],
+          "answer": 1,
+          "explanation": "Keys are React's identity for a list item between renders. With an index key, deleting the first of three items means the item formerly at index 1 is now index 0 — React thinks item 0 just changed its props, so it keeps the old DOM node and any internal state. Typed text in an input, a focus position, an open/closed toggle all end up on the wrong row. Use a stable id from your data. Index is acceptable only when the list is static — never reordered, filtered or added to.",
+          "followUp": "What if your data genuinely has no id — say a list of strings the user types?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["conditional-rendering", "gotcha"],
+          "prompt": "`items` is an empty array. What renders?",
+          "code": "return <div>{items.length && <List items={items} />}</div>;",
+          "language": "jsx",
+          "answer": "0",
+          "explanation": "`0 && anything` short-circuits to `0`, and React renders the number 0 as text — you get a stray zero on the page. `false`, `null` and `undefined` render nothing, but `0` and `NaN` are values. Fix it with an explicit boolean: `items.length > 0 && <List />`, or a ternary. This bug reaches production constantly because it only shows on the empty state.",
+          "followUp": "Why doesn't `false` have the same problem?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["props", "state"],
+          "prompt": "What's the difference between props and state, and how do you decide which a value should be?",
+          "keywords": [
+            "props|passed in|parent",
+            "read only|immutable|can't change|owned by parent",
+            "state|internal|owned|changes over time",
+            "re-render|rerender|render",
+            "lift|lifting|single source"
+          ],
+          "modelAnswer": "Props are inputs passed in by the parent. The component reads them and never writes them — they're owned by whoever rendered it. State is data the component owns, that changes over time in response to interaction, and that triggers a re-render when it's updated.\n\nThe decision procedure I use: does it change over time? If no, it's a prop or a constant. Can it be computed from existing props or state? If yes, compute it during render rather than storing it — derived state that's stored is the main source of things getting out of sync. Otherwise it's state, and it belongs in the lowest component that needs it.\n\nWhen two siblings need the same value, you lift it to their nearest common parent and pass it down with a setter. If you find yourself passing it through five layers, that's when context or a store starts earning its keep — but I'd reach for composition first, because most prop-drilling complaints are really component-boundary problems.",
+          "explanation": "The signal is 'derived values shouldn't be state' plus the lifting rule. Mentioning that you'd try composition before context is a mid-level flourish.",
+          "followUp": "Give an example of derived state you'd compute rather than store.",
+          "estSeconds": 150
+        },
+        {
+          "type": "multi",
+          "difficulty": 1,
+          "frequency": 2,
+          "tags": ["jsx"],
+          "prompt": "Which are true about JSX? Select all that apply.",
+          "choices": [
+            "It compiles to function calls that create element objects",
+            "`class` must be written as `className`",
+            "You can put statements like `if` directly inside braces",
+            "A component must return a single root node (or a fragment)",
+            "Attribute names are camelCase — `onclick` becomes `onClick`"
+          ],
+          "answer": [0, 1, 3, 4],
+          "explanation": "Braces take *expressions*, not statements — so a ternary or `&&` works but a bare `if` doesn't. Everything else holds: JSX compiles to `jsx(Component, props)` calls producing plain objects (which is why a component is cheap to create but not free), `class` is a reserved word so it's `className`, and a fragment `<>...</>` gives you a single root without a DOM element.",
+          "followUp": "Why does JSX require components to start with a capital letter?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 1,
+          "frequency": 2,
+          "tags": ["props", "typescript"],
+          "prompt": "Type a `Badge` component's props in TypeScript: a required label, an optional variant limited to three values, and children.",
+          "code": "type BadgeProps = {\n  label: string;\n  variant___: 'info' ___ 'warn' ___ 'error';\n  children?: React.___;\n};",
+          "language": "tsx",
+          "answer": ["?", "|", "|", "ReactNode"],
+          "explanation": "`React.ReactNode` is the right type for children — it covers elements, strings, numbers, arrays, null and false, which is everything React can render. `JSX.Element` is too narrow (it rejects a plain string), and `React.FC` is out of favour because it used to force an implicit children prop and complicates generics.",
+          "followUp": "Why has `React.FC` fallen out of fashion?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["composition"],
+          "prompt": "A `Card` component has grown to 14 boolean props (`showHeader`, `showFooter`, `bordered`, `compact`…). What's the standard React answer?",
+          "choices": [
+            "Split it into 14 separate components",
+            "Move the props into a config object",
+            "Use composition — accept `children` and slot props like `header` and `footer` so callers pass the JSX they want",
+            "Use context to avoid passing them"
+          ],
+          "answer": 2,
+          "explanation": "Boolean props are a component trying to predict every caller's needs. Composition inverts it: `<Card header={<Title/>}>…</Card>` lets the caller supply arbitrary content, and the Card stops needing to know about titles. This is why the standard advice is 'composition over configuration', and it's the same idea behind compound components like `<Select>` with `<Select.Option>`.",
+          "followUp": "What's a compound component, and when is the extra indirection worth it?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["props", "immutability"],
+          "prompt": "What's wrong here, and what does React do about it?",
+          "code": "function UserRow({ user }) {\n  user.name = user.name.toUpperCase();\n  return <td>{user.name}</td>;\n}",
+          "language": "jsx",
+          "answer": "it mutates a prop — React won't warn, but the parent's data is now permanently changed",
+          "explanation": "Props are read-only by convention, not by enforcement — nothing throws. But `user` is the parent's object, so you've silently modified their state. The parent may not re-render (the reference didn't change), so the UI and the data diverge, and the next render shows a doubly-uppercased value in some cases. Compute a local value instead: `const displayName = user.name.toUpperCase()`.",
+          "followUp": "Why might the parent not re-render even though its data changed?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["rendering"],
+          "prompt": "What does it mean when React 'renders' a component?",
+          "choices": [
+            "It updates the DOM immediately",
+            "It calls the component function to produce a description of the UI, then compares it with the previous one and applies only the differences to the DOM",
+            "It destroys and recreates the DOM subtree",
+            "It re-runs all the effects"
+          ],
+          "answer": 1,
+          "explanation": "Render is just calling your function — it must be pure and produce element objects. React then diffs that tree against the last one (reconciliation) and commits the minimal set of DOM mutations. A re-render is therefore cheap on its own; it's expensive when your component does real work during render, or when the subtree is huge. That distinction is the basis of every React performance conversation.",
+          "followUp": "So when does a re-render actually become a performance problem?",
+          "estSeconds": 60
+        }
+      ]
+    },
+    {
+      "slug": "state-and-forms",
+      "name": "State, Events & Forms",
+      "level": "foundation",
+      "summary": "useState properly, controlled inputs, and why your state update seems one step behind.",
+      "interviewAngle": "The 'state doesn't update immediately' question is guaranteed. So is controlled vs uncontrolled inputs.",
+      "keyPoints": [
+        "State updates are asynchronous and batched — reading the variable right after setting it gives the old value",
+        "Use the updater form `setCount(c => c + 1)` when the next value depends on the previous one",
+        "Never mutate state — always produce a new object or array",
+        "A controlled input's value comes from state; an uncontrolled one lives in the DOM",
+        "Passing a value to useState only sets the *initial* state; later changes to that value are ignored"
+      ],
+      "items": [
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["usestate", "batching"],
+          "prompt": "`count` starts at 0. What does the click log, and what is the final count?",
+          "code": "function handleClick() {\n  setCount(count + 1);\n  setCount(count + 1);\n  console.log(count);\n}",
+          "language": "jsx",
+          "answer": "logs 0, final count is 1",
+          "explanation": "`count` is a const captured by this render's closure — it stays 0 for the whole handler, so the log shows 0 and both calls set the state to 0 + 1. React batches them and renders once with 1. To increment twice, use the updater form: `setCount(c => c + 1)` twice, where each callback receives the pending value. This is the single most-asked React state question.",
+          "followUp": "Why does the updater form work when the direct form doesn't?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 1,
+          "frequency": 3,
+          "tags": ["controlled-inputs", "forms"],
+          "prompt": "What makes an input 'controlled'?",
+          "choices": [
+            "It has a `name` attribute",
+            "Its `value` comes from React state and it has an `onChange` that updates that state",
+            "It's inside a `<form>` element",
+            "It uses a ref"
+          ],
+          "answer": 1,
+          "explanation": "Controlled means React state is the single source of truth: the input displays `value` from state, and every keystroke goes through `onChange` back into state. Uncontrolled means the DOM node keeps its own value and you read it with a ref (or on submit via FormData). Controlled gives you validation-as-you-type, formatting and disabled-submit logic; uncontrolled is less code and avoids a re-render per keystroke. A `value` with no `onChange` gives you a read-only field and a React warning.",
+          "followUp": "For a 30-field form, which would you pick and why?",
+          "estSeconds": 45
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["immutability", "state"],
+          "prompt": "Clicking calls this. The list on screen doesn't change. Why?",
+          "code": "function addItem(item) {\n  items.push(item);\n  setItems(items);\n}",
+          "language": "jsx",
+          "answer": "it mutates the same array, so the reference is unchanged and React bails out of the re-render",
+          "explanation": "React compares the new state to the old with `Object.is`. `push` mutates in place, so you hand back the identical reference and React concludes nothing changed. The fix is a new array: `setItems([...items, item])`, or the updater form `setItems(prev => [...prev, item])`. The same applies to objects — spread, don't assign. This is why `sort`, `splice` and `reverse` are dangerous on state.",
+          "followUp": "Write the same for removing an item by id, and for updating one field of one item.",
+          "estSeconds": 75
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["forms", "state"],
+          "prompt": "Update one field of a form-state object without losing the others.",
+          "code": "function handleChange(e) {\n  const { name, value } = e.target;\n  setForm((prev) => ({ ...___, [___]: value }));\n}",
+          "language": "jsx",
+          "answer": ["prev", "name"],
+          "explanation": "Spread the previous state first, then override the one key. The computed key `[name]` lets one handler serve every input, as long as each input's `name` matches a state key. Using the updater form (`prev =>`) rather than the captured `form` matters when several changes land in one batch. Note the parentheses around the object literal — without them the arrow body is parsed as a block.",
+          "followUp": "How would this change for a checkbox or a number input?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["usestate", "initial-state"],
+          "prompt": "What's wrong with this, and what's the fix?",
+          "code": "const [rows, setRows] = useState(parseHugeCsv(file));",
+          "language": "jsx",
+          "choices": [
+            "Nothing — it runs once",
+            "`parseHugeCsv` runs on every render even though its result is only used the first time — pass a function instead: `useState(() => parseHugeCsv(file))`",
+            "You can't call functions in useState",
+            "It should be in useEffect"
+          ],
+          "answer": 1,
+          "explanation": "The argument to `useState` is evaluated on every render — React just ignores the value after the first. For a cheap literal that's fine; for expensive work it's a per-render cost you never see in the UI. Passing a function makes it *lazy initial state*: React calls it only on mount. The same trap exists with `useRef(expensive())`.",
+          "followUp": "What if the initial value needs to come from an API instead of a local computation?",
+          "estSeconds": 60
+        },
+        {
+          "type": "explain",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["forms", "validation"],
+          "prompt": "Walk me through building a create-user form: validation, submission, errors and loading.",
+          "keywords": [
+            "controlled|state|form state",
+            "validate|validation|schema",
+            "submit|preventdefault|onsubmit",
+            "loading|disable|pending|submitting",
+            "error|server error|field error",
+            "reset|redirect|success"
+          ],
+          "modelAnswer": "I'd hold the field values in one state object with a single change handler keyed by input `name` — or reach for React Hook Form, which keeps the inputs uncontrolled so you don't re-render on every keystroke.\n\nValidation runs from a schema (Zod) rather than hand-rolled ifs, so the same rules can run on the client for feedback and on the server for safety. I show field errors on blur rather than on every keystroke, so the form doesn't shout at someone halfway through typing an email.\n\nOn submit: `preventDefault`, set a `submitting` flag, disable the button so a double-click can't create two users, run client validation, then POST. On success, reset or redirect to the new record. On failure I distinguish cases — a 400 with field errors gets mapped back onto the individual inputs, a 409 becomes 'that email is taken' on the email field, and anything else becomes a form-level message with a retry.\n\nThe `submitting` flag must be cleared in a `finally` so a failed request doesn't leave the button disabled forever. And the server validates regardless of what the client did, because the client is not a security boundary.",
+          "explanation": "They want the whole loop, especially double-submit prevention, mapping server field errors back to inputs, and the point that client validation is UX not security.",
+          "followUp": "The POST succeeds but the user navigates away mid-request. What breaks?",
+          "estSeconds": 210
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["events"],
+          "prompt": "Which are true about React events? Select all that apply.",
+          "choices": [
+            "React attaches one listener at the root and delegates, rather than one per element",
+            "The event object is a SyntheticEvent wrapping the native one",
+            "`e.preventDefault()` works the same as in plain DOM",
+            "Returning `false` from a handler prevents the default action",
+            "`e.stopPropagation()` stops it reaching parent React handlers"
+          ],
+          "answer": [0, 1, 2, 4],
+          "explanation": "Returning `false` is a jQuery habit — React ignores the return value, so you must call `preventDefault` explicitly. Everything else holds: React delegates from the root container, wraps the native event for cross-browser consistency (`e.nativeEvent` gets you the original), and propagation control works as expected. React 17 changed the delegation root from `document` to the app container, which matters when embedding React in a larger page.",
+          "followUp": "Why did moving delegation off `document` matter for micro-frontends?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["state", "derived"],
+          "prompt": "You have `users` in state and want a filtered view. Which approach is right?",
+          "choices": [
+            "Store `filteredUsers` in a second state and sync it in an effect",
+            "Compute it during render: `const filtered = users.filter(...)`",
+            "Store it in a ref",
+            "Use useReducer with a FILTER action"
+          ],
+          "answer": 1,
+          "explanation": "Anything derivable from existing state should be computed during render, not stored. Storing it means two sources of truth that can disagree, plus an effect that runs a render late — so the user sees stale results for one frame. Just compute it. If the filter is genuinely expensive over thousands of rows, wrap it in `useMemo` — but measure first, because the memo itself has a cost.",
+          "followUp": "How would you know the filter is expensive enough to memoise?",
+          "estSeconds": 60
+        }
+      ]
+    },
+    {
+      "slug": "effects-and-data",
+      "name": "Effects & Data Fetching",
+      "level": "working",
+      "summary": "What useEffect is actually for, dependency arrays, cleanup, and the loading/error/empty states nobody demos.",
+      "interviewAngle": "'What's in the dependency array and why?' and 'why does my effect run twice?' are both extremely common.",
+      "keyPoints": [
+        "Effects synchronise with something outside React — not 'code that runs after render'",
+        "The dependency array must list every reactive value the effect reads",
+        "Return a cleanup function for subscriptions, timers and in-flight requests",
+        "StrictMode double-invokes effects in development to surface missing cleanup",
+        "Fetching in an effect needs to handle races — the response order isn't the request order"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["useeffect", "dependencies"],
+          "prompt": "What's the difference between these three?",
+          "code": "useEffect(fn);\nuseEffect(fn, []);\nuseEffect(fn, [id]);",
+          "language": "jsx",
+          "choices": [
+            "No dependency array runs once; `[]` runs on every render; `[id]` runs when id changes",
+            "No array runs after every render; `[]` runs once after mount; `[id]` runs after mount and whenever id changes",
+            "They're identical",
+            "`[]` never runs"
+          ],
+          "answer": 1,
+          "explanation": "No array means 'no constraint' — run after every render, which is almost always a mistake and often an infinite loop if the effect sets state. `[]` means the effect depends on nothing reactive, so it runs once after mount (twice in StrictMode dev). `[id]` re-runs whenever `id` changes by `Object.is`. Cleanup runs before each re-run and on unmount.",
+          "followUp": "What happens if you leave a value out of the array that the effect reads?",
+          "estSeconds": 60
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["useeffect", "infinite-loop"],
+          "prompt": "What goes wrong here?",
+          "code": "const [user, setUser] = useState(null);\n\nuseEffect(() => {\n  fetch('/api/user').then(r => r.json()).then(setUser);\n});",
+          "language": "jsx",
+          "answer": "infinite loop — no dependency array, so setUser triggers a render which runs the effect again",
+          "explanation": "With no dependency array the effect runs after every render. It sets state, which causes a render, which runs the effect, which fetches again — a request loop that will happily hammer your API. Adding `[]` makes it run once. This is the most common useEffect bug and it's usually spotted only when someone looks at the network tab.",
+          "followUp": "Now add cleanup so a slow response doesn't set state after unmount.",
+          "estSeconds": 75
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": ["fetching", "race-conditions"],
+          "prompt": "You fetch a user in an effect keyed on `userId`. Someone clicks quickly through three users. What can go wrong and how do you fix it?",
+          "keywords": [
+            "race|race condition|out of order|order",
+            "stale|old|previous",
+            "cleanup|cancel|abort|abortcontroller",
+            "ignore|flag|cancelled",
+            "react query|swr|library"
+          ],
+          "modelAnswer": "The three requests go out in order but there's no guarantee they come back in order. If the request for user 1 is slow and lands after user 3's, you end up displaying user 1's data while the URL and the rest of the UI say user 3. It's intermittent, so it's the kind of bug that survives QA and shows up under a bad connection.\n\nThe fix is cleanup. The simple version is an `ignore` flag: set `let ignore = false` at the top of the effect, check it before calling setState, and return a cleanup that sets it true. Because cleanup runs before the effect re-runs, any response from a superseded request is discarded.\n\nBetter, use an `AbortController` and pass its signal to fetch, aborting in cleanup — that also stops the wasted work and the wasted bandwidth, and you need to swallow the resulting `AbortError` so it doesn't surface as a real failure.\n\nIn practice I'd reach for React Query or SWR rather than hand-rolling this. They handle races, caching, deduplication, retries and stale-while-revalidate — that's about four hundred lines of edge cases you'd otherwise write yourself, badly.",
+          "explanation": "Naming the race explicitly, then giving both the ignore-flag and AbortController fixes, then saying you'd use a library — that's the full mid-level answer.",
+          "followUp": "Why does the cleanup function run before the next effect rather than after?",
+          "estSeconds": 210
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["strictmode"],
+          "prompt": "In development your effect runs twice on mount. What's happening?",
+          "choices": [
+            "A bug in your dependency array",
+            "React StrictMode deliberately mounts, unmounts and remounts to surface effects that don't clean up properly — it doesn't happen in production",
+            "The component is rendered twice by the router",
+            "You're calling the hook conditionally"
+          ],
+          "answer": 1,
+          "explanation": "StrictMode double-invokes effects in dev on purpose: if your effect is correctly written with cleanup, running it twice is harmless. If it isn't, you get a duplicate subscription or a doubled request — which is the point, because that same bug would appear in production when React remounts a component (Fast Refresh, offscreen rendering, future features). The fix is never to remove StrictMode; it's to write the cleanup.",
+          "followUp": "What kind of effect is genuinely unsafe to run twice, and how do you handle it?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["cleanup", "abortcontroller"],
+          "prompt": "Cancel an in-flight request when the effect re-runs.",
+          "code": "useEffect(() => {\n  const controller = new ___();\n  fetch(url, { ___: controller.signal })\n    .then((r) => r.json())\n    .then(setData)\n    .catch((e) => { if (e.name !== '___') throw e; });\n\n  return () => controller.___();\n}, [url]);",
+          "language": "jsx",
+          "answer": ["AbortController", "signal", "AbortError", "abort"],
+          "explanation": "Aborting rejects the fetch promise with an `AbortError`, which you have to filter out — otherwise every navigation logs a spurious failure. The cleanup runs before the next effect and on unmount, so both the race and the set-state-after-unmount problems disappear. The same controller signal can be passed to multiple fetches to cancel them as a group.",
+          "followUp": "Does aborting actually stop the server doing the work?",
+          "estSeconds": 90
+        },
+        {
+          "type": "multi",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["useeffect", "when-not-to"],
+          "prompt": "Which of these should **not** be a useEffect? Select all that apply.",
+          "choices": [
+            "Transforming props into a value you display",
+            "Subscribing to a websocket",
+            "Resetting state when a prop changes",
+            "Handling a button click's API call",
+            "Syncing document.title with state"
+          ],
+          "answer": [0, 2, 3],
+          "explanation": "Transformation belongs in the render body — an effect makes it a render late. Resetting state on a prop change is better done with a `key` on the component, which remounts it and resets everything for free. Event-driven work belongs in the event handler, not in an effect watching for the state the handler set. Effects are for synchronising with things *outside* React: subscriptions, timers, the document, non-React widgets.",
+          "followUp": "Show the `key` trick for resetting a form when the selected record changes.",
+          "estSeconds": 90
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["stale-closure"],
+          "prompt": "The counter shows 1 and never goes higher. Why?",
+          "code": "useEffect(() => {\n  const id = setInterval(() => setCount(count + 1), 1000);\n  return () => clearInterval(id);\n}, []);",
+          "language": "jsx",
+          "answer": "stale closure — the interval callback captured count = 0 forever, so it always sets 1",
+          "explanation": "With `[]` the effect runs once, and its callback closes over the `count` from the first render — permanently 0. So every tick sets state to 1. Two fixes: use the updater form `setCount(c => c + 1)`, which needs no captured value and is the right answer here; or add `count` to the deps, which works but tears down and recreates the interval every second. This is the same closure mechanism as the `var` in a loop question.",
+          "followUp": "Why is the updater form better than adding `count` to the deps?",
+          "estSeconds": 90
+        },
+        {
+          "type": "order",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["lifecycle"],
+          "prompt": "A component with `useEffect(fn, [id])` is mounted, then `id` changes. Order what happens.",
+          "choices": [
+            "React renders the component with the new id and commits the DOM changes",
+            "The previous effect's cleanup function runs",
+            "The effect function runs again with the new id",
+            "The browser paints the updated screen"
+          ],
+          "answer": [0, 3, 1, 2],
+          "explanation": "Render and commit happen first, then the browser paints — `useEffect` is deliberately asynchronous so it doesn't block painting. Only after that does React run the previous cleanup and then the new effect. That ordering is why a fetch in an effect always shows one frame of the old or empty state, and why `useLayoutEffect` exists for the rare case where you must measure and adjust before paint.",
+          "followUp": "When would you actually need `useLayoutEffect`?",
+          "estSeconds": 90
+        }
+      ]
+    },
+    {
+      "slug": "hooks-in-depth",
+      "name": "Hooks In Depth",
+      "level": "working",
+      "summary": "useRef, useMemo, useCallback, useReducer, context, and writing your own hook.",
+      "interviewAngle": "'When would you use useMemo?' is a trap — the good answer includes 'usually not', with a reason.",
+      "keyPoints": [
+        "Hooks must be called unconditionally, in the same order, at the top level",
+        "useRef holds a mutable value that survives renders without causing one",
+        "useMemo caches a value; useCallback caches a function identity",
+        "Memoisation only pays off when it prevents expensive work or breaks a re-render chain",
+        "Context re-renders every consumer when its value changes — split contexts or memoise the value"
+      ],
+      "items": [
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["rules-of-hooks"],
+          "prompt": "Why can't you call a hook inside an `if`?",
+          "choices": [
+            "It's a style rule enforced by the linter only",
+            "React identifies hooks by call order, so a conditional call shifts every subsequent hook's slot and they read each other's state",
+            "Hooks are async",
+            "It breaks TypeScript inference"
+          ],
+          "answer": 1,
+          "explanation": "There's no name attached to a hook call — React keeps an array per component and advances an index each time. First render: `useState` at 0, `useEffect` at 1. If a condition skips the first one on a later render, the effect now reads slot 0 and everything is scrambled. That's the entire reason for the rule. The fix is to call the hook unconditionally and put the condition *inside* it, or split into two components.",
+          "followUp": "How would you conditionally run an effect, then?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["useref"],
+          "prompt": "Which is **not** a valid use of `useRef`?",
+          "choices": [
+            "Holding a DOM node to call `.focus()` on it",
+            "Storing an interval id so cleanup can clear it",
+            "Storing a value you display in the UI",
+            "Keeping the previous value of a prop for comparison"
+          ],
+          "answer": 2,
+          "explanation": "Mutating `ref.current` does not trigger a render, so anything you display will show a stale value until something else re-renders. Refs are for values that need to survive renders without driving them: DOM handles, timer ids, mutable flags, the previous value of something, a cached instance. If the UI depends on it, it's state.",
+          "followUp": "How do you get the previous value of a prop using a ref?",
+          "estSeconds": 45
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": ["usememo", "usecallback", "performance"],
+          "prompt": "When do you use `useMemo` and `useCallback` — and when are they a net loss?",
+          "keywords": [
+            "expensive|costly|heavy computation",
+            "reference|referential|identity|same reference",
+            "memo|react.memo|child",
+            "dependency|dependency array|effect",
+            "cost|overhead|not free|premature",
+            "measure|profile"
+          ],
+          "modelAnswer": "Three legitimate reasons. One: the computation is genuinely expensive — filtering and sorting ten thousand rows on every keystroke. Two: you need referential stability, because the value is passed to a `React.memo` child or used in a dependency array, and a fresh object or function each render defeats both. Three: you're constructing a context value, where a new object re-renders every consumer.\n\n`useCallback` is just `useMemo` for a function; the only reason to keep a function's identity stable is those same downstream comparisons.\n\nThey're a net loss the rest of the time. Memoisation isn't free: you allocate the dependency array, compare it every render, and keep the old value alive. For `const total = a + b`, the memo costs more than the addition. And wrapping a callback in `useCallback` while the child isn't memoised buys literally nothing — it's a very common cargo-cult.\n\nSo my default is to write it plainly and reach for memoisation when the profiler shows a problem. React Compiler is changing this — it inserts the memoisation automatically — but until it's on in a project, measure first.",
+          "explanation": "The distinguishing points are referential stability as a separate reason from expense, and knowing that `useCallback` without a memoised child does nothing.",
+          "followUp": "Your `useCallback` still causes the child to re-render. What are the likely reasons?",
+          "estSeconds": 210
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["context", "performance"],
+          "prompt": "Every consumer re-renders on every render of the provider's parent. Why?",
+          "code": "function App({ children }) {\n  const [user, setUser] = useState(null);\n  return (\n    <UserContext.Provider value={{ user, setUser }}>\n      {children}\n    </UserContext.Provider>\n  );\n}",
+          "language": "jsx",
+          "answer": "the value is a new object literal every render, so every consumer sees a changed context",
+          "explanation": "Context consumers re-render when the provider's `value` changes by identity. `{ user, setUser }` allocates a fresh object each render, so it always differs — even when `user` hasn't. Wrap it in `useMemo(() => ({ user, setUser }), [user])`. The deeper fix for a context holding both frequently- and rarely-changing data is to split it into two providers, so a data change doesn't re-render components that only need the setters.",
+          "followUp": "Why is splitting into two contexts often better than memoising one?",
+          "estSeconds": 90
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["usereducer"],
+          "prompt": "When is `useReducer` a better fit than `useState`?",
+          "choices": [
+            "Whenever you have more than one piece of state",
+            "When several state values change together according to rules, or the next state depends on the previous in non-trivial ways",
+            "When you need async updates",
+            "It's the required approach in React 18+"
+          ],
+          "answer": 1,
+          "explanation": "The tell is state that moves in coordinated steps: a wizard where advancing changes step, validation and a progress flag together, or a fetch state machine where 'success' must clear the error and set the data at once. Putting those transitions in a reducer means the rules live in one testable pure function, and you can't accidentally set two of them inconsistently. Three unrelated `useState` calls are fine and clearer — reach for the reducer when the values are related.",
+          "followUp": "How does `useReducer` help with the stale-closure problem?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["custom-hooks"],
+          "prompt": "Complete a custom hook that debounces a value.",
+          "code": "function useDebounced(value, delay) {\n  const [debounced, setDebounced] = useState(value);\n\n  useEffect(() => {\n    const id = setTimeout(() => setDebounced(value), delay);\n    return () => ___(id);\n  }, [___, ___]);\n\n  return debounced;\n}",
+          "language": "jsx",
+          "answer": ["clearTimeout", "value", "delay"],
+          "explanation": "The cleanup cancels the pending timer every time `value` changes, so only a pause longer than `delay` lets one fire. Used for search-as-you-type: `const q = useDebounced(input, 300)` and fetch on `q`. This is the canonical custom-hook example because it shows the two things that define one — it calls other hooks, and its name starts with `use`. A custom hook shares *logic*, not state: two components calling it get independent state.",
+          "followUp": "How would you extend this to also expose whether a debounce is pending?",
+          "estSeconds": 90
+        },
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["context"],
+          "prompt": "Which are good reasons to reach for context? Select all that apply.",
+          "choices": [
+            "Theme or locale that many components deep in the tree need",
+            "The current authenticated user",
+            "Avoiding passing a prop through two components",
+            "High-frequency state like form input values",
+            "Dependency injection for services in tests"
+          ],
+          "answer": [0, 1, 4],
+          "explanation": "Context is for values that are genuinely global-ish and change rarely — theme, locale, auth, a service client you want to swap in tests. Two levels of prop drilling is not a problem worth a context. And high-frequency updates through context re-render every consumer on every keystroke, which is exactly what context is bad at — that's what a store with selectors (Zustand, Redux) or just local state is for.",
+          "followUp": "Why does Redux/Zustand handle high-frequency updates better than context?",
+          "estSeconds": 75
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 1,
+          "tags": ["custom-hooks"],
+          "prompt": "Two components both call `useCounter()`. What do they share?",
+          "choices": [
+            "The same state — the hook is a singleton",
+            "Nothing — each call gets its own independent state; the hook shares logic, not data",
+            "State, but only within the same parent",
+            "Depends on whether it uses useState or useRef"
+          ],
+          "answer": 1,
+          "explanation": "A custom hook is a function that happens to call other hooks. Calling it twice runs `useState` twice, in two different components, giving two independent state slots. This surprises people who expect it to behave like a store. To share actual data you need something outside the components — context, a store, or lifting the state to a common parent.",
+          "followUp": "How would you turn `useCounter` into something two components genuinely share?",
+          "estSeconds": 60
+        }
+      ]
+    },
+    {
+      "slug": "react-crud",
+      "name": "Building a CRUD Screen",
+      "level": "professional",
+      "summary": "List, detail, create, edit, delete — plus the loading, empty, error and optimistic-update details that make it feel finished.",
+      "interviewAngle": "This is the take-home. They're looking for handled edge states, no double submits, and a sane data-fetching story.",
+      "keyPoints": [
+        "Every async view has four states: loading, error, empty, and data",
+        "Server state and client state are different problems — use a query library for the former",
+        "Optimistic updates need a rollback path when the request fails",
+        "After a mutation, invalidate the cache rather than hand-patching every list",
+        "Confirm destructive actions and disable the button while the request is in flight"
+      ],
+      "items": [
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["ux-states"],
+          "prompt": "A list view fetches from an API. Which states must the component handle? Select all that apply.",
+          "choices": [
+            "Loading — nothing to show yet",
+            "Error — the request failed, with a retry",
+            "Empty — the request succeeded but returned no rows",
+            "Data — render the rows",
+            "Stale — showing cached data while refetching"
+          ],
+          "answer": [0, 1, 2, 3, 4],
+          "explanation": "All five. The one juniors skip is empty: a successful request returning zero rows renders a blank panel that looks broken, when it should say 'No users yet' with a create button. The one mid-level devs skip is stale — if you refetch on focus, you need to decide whether to show the old data with a subtle indicator or blank the screen. Blanking on every refetch is the classic 'why does it flash?' complaint.",
+          "followUp": "How do you tell an empty result apart from a failed one that returned an empty body?",
+          "estSeconds": 75
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": ["data-fetching", "architecture"],
+          "prompt": "Why would you use React Query / SWR instead of useEffect + useState for server data?",
+          "keywords": [
+            "cache|caching|shared cache",
+            "dedupe|deduplication|duplicate requests",
+            "stale|revalidate|refetch|background",
+            "race|race condition|cancel",
+            "retry|error|loading|boilerplate",
+            "invalidate|invalidation|mutation"
+          ],
+          "modelAnswer": "Because server data isn't really state — it's a cache of something you don't own, and treating it as component state means reimplementing a cache badly in every component.\n\nA query library gives you: a shared cache keyed by query, so two components asking for the same user make one request; automatic deduplication and background revalidation, so the data stays fresh without a spinner; race-condition handling and cancellation; retries with backoff; and loading/error state without writing the same three `useState` calls in every file.\n\nThe part that matters most on a CRUD app is invalidation. After a mutation you invalidate the affected query keys and everything showing that data updates itself — the list, the detail panel, the count in the header. Hand-rolled, you'd be passing refetch callbacks around or lifting all the data to a common ancestor.\n\nThe cost is a dependency and a mental model to learn — query keys, stale time, cache time. For an app with three screens and one endpoint I'd skip it. Past that, it's less code, not more.",
+          "explanation": "The framing that impresses is 'server data is a cache, not state'. Naming invalidation-after-mutation shows you've built something real.",
+          "followUp": "Where does a query library stop helping — what's still your problem?",
+          "estSeconds": 210
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["optimistic-updates"],
+          "prompt": "You optimistically remove a row on delete. The request fails. What must you have done?",
+          "choices": [
+            "Nothing — show an error toast",
+            "Snapshotted the previous list before the update so you can roll back, then restore it and surface the error",
+            "Refetched the list from scratch",
+            "Used a loading spinner instead"
+          ],
+          "answer": 1,
+          "explanation": "An optimistic update is a bet. If it loses you must put the UI back exactly as it was, which means capturing the previous data before you mutate — React Query's `onMutate` returns a context object for precisely this, consumed in `onError`. Refetching also works but is slower and can flash. And rolling back silently is worse than not being optimistic: the row reappears and the user has no idea why.",
+          "followUp": "Which operations are worth doing optimistically, and which aren't?",
+          "estSeconds": 75
+        },
+        {
+          "type": "predict",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["forms", "double-submit"],
+          "prompt": "What's the bug, and what's the one-line fix?",
+          "code": "<button onClick={async () => {\n  await createUser(form);\n  router.push('/users');\n}}>\n  Create\n</button>",
+          "language": "jsx",
+          "answer": "double submit — the button isn't disabled while the request is in flight",
+          "explanation": "On a slow connection nothing visibly happens after the first click, so users click again and you create two records. Track a `submitting` flag and set `disabled={submitting}` — clearing it in a `finally` so a failure doesn't leave the button dead. Server-side, an idempotency key or a unique constraint is the real protection, because the client is never a guarantee.",
+          "followUp": "How would the server make this genuinely idempotent?",
+          "estSeconds": 60
+        },
+        {
+          "type": "order",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["mutation-flow"],
+          "prompt": "Order the steps of a well-behaved 'edit user' save.",
+          "choices": [
+            "Validate the form client-side and show field errors if it fails",
+            "Disable the save button and show a pending indicator",
+            "Send the PATCH and await the response",
+            "Invalidate the affected queries so the list and detail refresh",
+            "Re-enable the button and show success or map server errors back onto fields"
+          ],
+          "answer": [0, 1, 2, 3, 4],
+          "explanation": "Validate before you make a request you know will fail. Disable immediately so the pending state is visible and a second click can't land. Then the request. On success, invalidate rather than hand-patching the cache. And always land in a state where the button works again — clearing the pending flag in `finally` is what stops a failed save from bricking the form.",
+          "followUp": "Where would an optimistic update slot into this sequence?",
+          "estSeconds": 90
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["keys", "reset"],
+          "prompt": "The edit form keeps showing the previously-selected user's values. Reset it by remounting when the selection changes.",
+          "code": "<EditUserForm ___={selectedId} user={selectedUser} />",
+          "language": "jsx",
+          "answer": ["key"],
+          "explanation": "Changing a component's `key` tells React it's a different component — it unmounts the old one and mounts a fresh one, so all internal state (including the form fields initialised from props) resets. It's far cleaner than an effect watching `selectedId` and calling half a dozen setters, and it's the officially recommended way to reset state on a prop change.",
+          "followUp": "What's the downside of the key trick on an expensive component?",
+          "estSeconds": 60
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["routing"],
+          "prompt": "In an admin app, where should 'which user is selected' live?",
+          "choices": [
+            "In component state",
+            "In the URL — as a route param or query string",
+            "In context",
+            "In localStorage"
+          ],
+          "answer": 1,
+          "explanation": "Putting it in the URL makes the view shareable, bookmarkable, and correct on refresh and back-button. It also means the state has exactly one home, so you can't get the URL and the UI out of sync. The rule of thumb: anything a user would reasonably expect to survive a refresh or be linkable — selection, filters, pagination, tab — belongs in the URL. Ephemeral UI like 'is this dropdown open' does not.",
+          "followUp": "Which filter state would you *not* put in the URL?",
+          "estSeconds": 60
+        },
+        {
+          "type": "multi",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["accessibility", "quality"],
+          "prompt": "Which of these would a reviewer flag on a CRUD screen? Select all that apply.",
+          "choices": [
+            "A delete button with no confirmation",
+            "A `<div onClick>` used as a button",
+            "Form inputs with no associated `<label>`",
+            "A table with a caption and scope attributes",
+            "Errors shown only as a colour change"
+          ],
+          "answer": [0, 1, 2, 4],
+          "explanation": "A clickable div isn't focusable, isn't announced as a button, and doesn't respond to Enter or Space — use a real `<button>`. Inputs without labels are unusable with a screen reader and break click-to-focus. Colour-only errors fail contrast requirements and are invisible to colourblind users, so pair colour with text and an icon. A captioned table with proper scopes is the good example in the list.",
+          "followUp": "What's the minimum accessible confirmation dialog — what does it need beyond looking right?",
+          "estSeconds": 90
+        }
+      ]
+    },
+    {
+      "slug": "react-performance",
+      "name": "Re-renders & Performance",
+      "level": "professional",
+      "summary": "What actually causes a re-render, when it matters, and how to find the slow thing rather than guessing.",
+      "interviewAngle": "They want to know you measure before optimising, and that you understand React.memo's comparison is shallow.",
+      "keyPoints": [
+        "A component re-renders when its state changes, its parent re-renders, or its context value changes",
+        "Re-rendering is not the same as re-mounting, and it's usually cheap",
+        "React.memo does a shallow prop comparison — a new object or function prop defeats it",
+        "Moving state down or passing children through can eliminate whole subtrees of re-renders",
+        "Profile with the React DevTools profiler before changing anything"
+      ],
+      "items": [
+        {
+          "type": "multi",
+          "difficulty": 2,
+          "frequency": 3,
+          "tags": ["re-renders"],
+          "prompt": "Which cause a component to re-render? Select all that apply.",
+          "choices": [
+            "Its own state changed",
+            "Its parent re-rendered",
+            "A context it consumes changed value",
+            "One of its props changed value but the parent didn't re-render",
+            "A ref it holds was mutated"
+          ],
+          "answer": [0, 1, 2],
+          "explanation": "Props can't change without the parent re-rendering — that's what produces the new props, so option 4 describes something that can't happen. Mutating a ref deliberately doesn't render; that's the whole point of refs. The one that surprises people is the second: a parent re-rendering re-renders all its children by default, whether or not their props changed. `React.memo` is the opt-out.",
+          "followUp": "So why isn't every component wrapped in React.memo by default?",
+          "estSeconds": 75
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 3,
+          "tags": ["react-memo"],
+          "prompt": "`Row` is wrapped in `React.memo`. It still re-renders every time. Why?",
+          "code": "<Row\n  item={item}\n  onSelect={() => select(item.id)}\n  style={{ padding: 8 }}\n/>",
+          "language": "jsx",
+          "answer": "the inline arrow and object literal are new references every render, so the shallow prop comparison always fails",
+          "explanation": "`React.memo` compares props shallowly with `Object.is`. An inline arrow function and an inline object literal are freshly allocated on every render, so they never match the previous ones and the memo never hits. Fixes: `useCallback` for the handler (with a stable `item.id`), hoist the style object out of the component or use a CSS class. This is why so many `React.memo`s in real codebases do nothing at all.",
+          "followUp": "How would you verify the memo is actually working?",
+          "estSeconds": 90
+        },
+        {
+          "type": "explain",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["performance", "process"],
+          "prompt": "A page feels sluggish when typing in a search box. How do you diagnose and fix it?",
+          "keywords": [
+            "profiler|devtools|measure|profile",
+            "re-render|rerender|why did this render",
+            "debounce|throttle",
+            "memo|usememo|react.memo",
+            "virtual|virtualise|windowing|pagination",
+            "state|move state down|colocate"
+          ],
+          "modelAnswer": "First measure — I'd open the React DevTools profiler, record a few keystrokes, and look at the flame graph for what's actually rendering and how long each commit takes. The 'why did this render' setting tells you whether it's props, state or a hook. Guessing here wastes days.\n\nThe usual culprits, in order of how often they're the answer. One: the search input's state lives too high, so every keystroke re-renders the entire page — moving that state down into a small component, or passing the expensive subtree through as `children` so it isn't re-created, fixes it outright. Two: an expensive filter or sort running on every keystroke over a large list — memoise it, or debounce the input so it runs every 300ms instead of every character. Three: rendering two thousand rows at once, where the fix is virtualisation or pagination, not memoisation.\n\nOnly after that would I start adding `React.memo` and `useCallback`, and I'd re-profile to confirm each one actually helped — a memo on a component receiving inline objects does nothing while still costing a comparison.\n\nAnd I'd check it's a React problem at all. A layout thrash from reading `offsetHeight` in a loop, or a huge unoptimised image, looks identical to the user and won't show up in the React profiler.",
+          "explanation": "Measure first, structural fixes (move state, virtualise) before memoisation, and re-measure after. Considering that it might not be React at all is a strong extra.",
+          "followUp": "What's the difference between debouncing the input value and debouncing the fetch?",
+          "estSeconds": 210
+        },
+        {
+          "type": "mcq",
+          "difficulty": 3,
+          "frequency": 2,
+          "tags": ["composition", "performance"],
+          "prompt": "Why does passing an expensive subtree as `children` stop it re-rendering when the parent's state changes?",
+          "code": "function Layout({ children }) {\n  const [open, setOpen] = useState(false);\n  return <div>{children}</div>;\n}",
+          "language": "jsx",
+          "choices": [
+            "It doesn't — children always re-render",
+            "`children` was created by the *grandparent*, so when Layout re-renders it receives the same element object and React can skip that subtree",
+            "React automatically memoises children",
+            "Because children is a special prop"
+          ],
+          "answer": 1,
+          "explanation": "The element object for `children` is created where the JSX is written — in the parent that renders `<Layout>...</Layout>`. When Layout's own state changes, Layout re-renders but `children` is the identical object it got before, so React bails out of re-rendering that subtree. It's `React.memo` for free, with no comparison cost, purely from where you put the JSX. This is the most underused React performance technique.",
+          "followUp": "Where else does this 'lift the expensive part into a prop' trick apply?",
+          "estSeconds": 90
+        },
+        {
+          "type": "mcq",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["lists", "virtualisation"],
+          "prompt": "You need to render 10,000 rows. What's the right approach?",
+          "choices": [
+            "React.memo on the row component",
+            "useMemo on the array",
+            "Virtualise — render only the rows in the viewport plus a small buffer (react-window / TanStack Virtual)",
+            "Split into multiple components"
+          ],
+          "answer": 2,
+          "explanation": "Memoisation doesn't help when the work is 'create and mount 10,000 DOM nodes' — that's the cost, and the browser pays it in layout and memory regardless of how clever your React is. Virtualisation renders maybe 30 rows and swaps their contents as you scroll, so the cost is constant. Pagination or infinite scroll solves the same problem by not asking for 10,000 rows in the first place, which is usually the better product answer.",
+          "followUp": "What does virtualisation break that you have to handle yourself?",
+          "estSeconds": 60
+        },
+        {
+          "type": "fill",
+          "difficulty": 2,
+          "frequency": 2,
+          "tags": ["code-splitting"],
+          "prompt": "Load a heavy chart component only when it's actually rendered.",
+          "code": "const Chart = React.___(() => import('./Chart'));\n\n<___ fallback={<Spinner />}>\n  <Chart data={data} />\n</___>",
+          "language": "jsx",
+          "answer": ["lazy", "Suspense", "Suspense"],
+          "explanation": "`React.lazy` turns a dynamic import into a component; `Suspense` supplies what to show while the chunk downloads. This keeps a charting library out of the initial bundle for users who never open that tab. Good split points are route boundaries, modals, and anything below the fold or behind a click — splitting a 2KB component just adds a round trip.",
+          "followUp": "What happens if the chunk fails to load, and how do you handle it?",
+          "estSeconds": 75
+        },
+        {
+          "type": "predict",
+          "difficulty": 3,
+          "frequency": 1,
+          "tags": ["reconciliation"],
+          "prompt": "Toggling `isEditing` wipes the input's text. Why?",
+          "code": "return isEditing\n  ? <div className=\"edit\"><Input /></div>\n  : <section className=\"view\"><Input /></section>;",
+          "language": "jsx",
+          "answer": "the wrapper element type changes, so React unmounts the whole subtree and remounts Input with fresh state",
+          "explanation": "Reconciliation matches by position *and* element type. `div` and `section` at the same position are different types, so React tears down everything below and builds it again — the `Input` is a new instance with new state. Keep the same wrapper element and vary the className, or hoist the `Input` above the conditional. The same rule is why a component defined *inside* another component remounts on every render: it's a new function reference, so a new type.",
+          "followUp": "Why is defining a component inside another component so damaging?",
+          "estSeconds": 90
+        },
+        {
+          "type": "multi",
+          "difficulty": 3,
+          "frequency": 1,
+          "tags": ["bundle-size"],
+          "prompt": "Which actually reduce the JavaScript a user downloads? Select all that apply.",
+          "choices": [
+            "Route-based code splitting",
+            "Importing only what you need from a library (`import { debounce } from 'lodash-es'`)",
+            "Wrapping components in React.memo",
+            "Replacing moment.js with date-fns or Temporal",
+            "Rendering static parts on the server"
+          ],
+          "answer": [0, 1, 3, 4],
+          "explanation": "`React.memo` affects runtime re-renders, not bundle size — it slightly increases it. The others are real: splitting by route defers code, tree-shakeable named imports drop the unused 90% of a utility library, moment is famously large and unshakeable because of its locale bundling, and server rendering means the markup arrives as HTML rather than as JS that builds it. Measure with a bundle analyser before and after.",
+          "followUp": "Why is lodash-es tree-shakeable when plain lodash isn't?",
+          "estSeconds": 90
+        }
+      ]
+    }
+  ]
+}

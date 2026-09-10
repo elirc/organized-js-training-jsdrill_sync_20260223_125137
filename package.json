@@ -1,14 +1,20 @@
 {
-  "name": "reps",
-  "version": "0.1.0",
+  "name": "ramp",
+  "version": "1.0.0",
   "private": true,
+  "description": "Interview-focused upskilling for the JS/TS/React/Node and C#/.NET stack",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:seed": "npx tsx src/lib/db/seed.ts",
-    "db:reset": "rm -f reps.db && npx tsx src/lib/db/seed.ts"
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run content:check",
+    "db:seed": "tsx src/lib/db/seed.ts",
+    "db:reset": "node -e \"require('fs').rmSync('ramp.db',{force:true});require('fs').rmSync('ramp.db-wal',{force:true});require('fs').rmSync('ramp.db-shm',{force:true})\" && npm run db:seed",
+    "content:check": "tsx src/lib/db/validate.ts",
+    "check:gradable": "tsx scripts/check-gradable.ts",
+    "check:code": "tsx scripts/check-code-items.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.0",
@@ -23,8 +29,7 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "ts-fsrs": "^5.2.3",
-    "uuid": "^13.0.0"
+    "ts-fsrs": "^5.2.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -32,7 +37,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/uuid": "^10.0.0",
     "drizzle-kit": "^0.31.9",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
